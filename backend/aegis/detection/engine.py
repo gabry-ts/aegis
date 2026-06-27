@@ -15,9 +15,14 @@ from .. import config, schemas
 from . import loader, pii, judge
 
 
-def inspect(text: str, direction: str = "input") -> Dict:
-    """Inspect `text` against the rule pack and return the canonical dict."""
-    hit = loader.worst(text, direction)
+def inspect(text: str, direction: str = "input", active_ids=None, judge_enabled=None) -> Dict:
+    """Inspect `text` against an endpoint's active rules and return the canonical dict.
+
+    `active_ids` is the set of armed rule ids for the calling endpoint (None means
+    the whole library). `judge_enabled` is the endpoint's judge flag; None falls
+    back to the global runtime switch so endpoint-agnostic callers keep working.
+    """
+    hit = loader.worst(text, direction, active_ids)
     if hit:
         mapping = hit.get("mapping", {})
         return schemas.detection_result(
@@ -34,7 +39,8 @@ def inspect(text: str, direction: str = "input") -> Dict:
             atlas_id=mapping.get("atlas"),
         )
 
-    if direction == "input" and judge.available():
+    use_judge = judge.is_enabled() if judge_enabled is None else bool(judge_enabled)
+    if direction == "input" and use_judge and judge.provider_available():
         verdict_data = judge.classify(text)
         if verdict_data.get("verdict", "SAFE") != schemas.Verdict.SAFE.value:
             severity = int(verdict_data.get("severity", 3))

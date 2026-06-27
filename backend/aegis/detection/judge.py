@@ -60,6 +60,15 @@ def available() -> bool:
     return config.use_regolo() and _enabled
 
 
+def provider_available() -> bool:
+    """True when a real judge model is wired up, independent of any toggle.
+
+    Per-endpoint flows decide whether the judge runs; this only reports whether
+    a real model exists to run it (it never does in offline mock mode).
+    """
+    return config.use_regolo()
+
+
 def classify(text: str) -> Dict:
     """Classify `text` via the LLM judge.
 

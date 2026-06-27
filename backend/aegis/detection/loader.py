@@ -179,17 +179,31 @@ def _detect(rule, text):
     return False
 
 
-def run(text, surface):
-    """Public summaries of every enabled rule that fires on `text`."""
+def all_ids():
+    """Every rule id defined in the shared library, in pack order."""
+    return [r["id"] for r in _pack["rules"]]
+
+
+def _is_active(rule, active_ids):
+    """A rule is active when it belongs to the endpoint's set (None = whole library)."""
+    return True if active_ids is None else rule["id"] in active_ids
+
+
+def run(text, surface, active_ids=None):
+    """Public summaries of every active rule that fires on `text`.
+
+    `active_ids` is the per-endpoint set of armed rule ids; None means the whole
+    library (used by endpoint-agnostic callers and tests).
+    """
     return [
         _public(r)
         for r in _pack["rules"]
-        if r["enabled"] and r["surface"] == surface and _detect(r, text)
+        if r["surface"] == surface and _is_active(r, active_ids) and _detect(r, text)
     ]
 
 
-def worst(text, surface):
-    hits = run(text, surface)
+def worst(text, surface, active_ids=None):
+    hits = run(text, surface, active_ids)
     if not hits:
         return None
     return max(hits, key=lambda h: h["severity"])
@@ -199,13 +213,13 @@ def action_for(rule_action):
     return _ACTION_MAP.get(rule_action, "LOGGED")
 
 
-def covered_owasp():
-    """OWASP ids covered by at least one enabled rule."""
+def covered_owasp(active_ids=None):
+    """OWASP ids covered by at least one active rule (None = whole library)."""
     return sorted(
         {
             r.get("mapping", {}).get("owasp")
             for r in _pack["rules"]
-            if r["enabled"] and r.get("mapping", {}).get("owasp")
+            if _is_active(r, active_ids) and r.get("mapping", {}).get("owasp")
         }
     )
 
