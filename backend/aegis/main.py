@@ -391,19 +391,63 @@ def api_audit_chat(req: schemas.AuditChatRequest):
 
 
 @app.get("/api/frameworks")
-def api_frameworks():
-    """OWASP LLM Top 10 (2025) coverage (live from enabled rules) + ATLAS mapping."""
-    covered = set(detloader.covered_owasp())
+def api_frameworks(endpoint: str = None):
+    """OWASP LLM Top 10 (2025) coverage (live from an endpoint's armed rules) + ATLAS."""
+    active = endpoints.active_ids(endpoint) if endpoint else None
+    covered = set(detloader.covered_owasp(active))
     owasp = [{**o, "covered": o["id"] in covered} for o in schemas.OWASP_TOP10]
     return {"owasp": owasp, "mapping": schemas.FRAMEWORKS}
 
 
 @app.get("/api/detections")
 def api_detections():
+    """The shared rule library plus whether a real judge model is wired up.
+
+    Per-endpoint judge state lives on the endpoint (see /api/endpoints); here
+    `available` only reports that a model exists to run the judge at all.
+    """
     return {
         "rules": detloader.list_rules(),
-        "judge": {"enabled": judge.is_enabled(), "available": judge.available()},
+        "judge": {"available": judge.provider_available()},
     }
+
+
+# ---- endpoints (named guardrail flows over the shared rule library) ------
+
+@app.get("/api/endpoints")
+def api_endpoints():
+    return {"endpoints": endpoints.list_endpoints()}
+
+
+@app.post("/api/endpoints")
+def api_endpoints_create(req: schemas.EndpointCreate):
+    return endpoints.create(
+        name=req.name, slug=req.slug, description=req.description,
+        rules=req.rules, judge=req.judge,
+    )
+
+
+@app.put("/api/endpoints/{slug}")
+def api_endpoints_update(slug: str, req: schemas.EndpointUpdate):
+    return endpoints.update(
+        slug, name=req.name, description=req.description, rules=req.rules, judge=req.judge,
+    )
+
+
+@app.delete("/api/endpoints/{slug}")
+def api_endpoints_delete(slug: str):
+    return endpoints.delete(slug)
+
+
+@app.post("/api/endpoints/{slug}/rules/{rule_id}/toggle")
+def api_endpoints_rule_toggle(slug: str, rule_id: str):
+    """Arm or disarm a library rule for this endpoint (per-endpoint membership)."""
+    return endpoints.toggle_rule(slug, rule_id)
+
+
+@app.post("/api/endpoints/{slug}/judge/toggle")
+def api_endpoints_judge_toggle(slug: str):
+    return endpoints.toggle_judge(slug)
 
 
 @app.post("/api/detections/judge/toggle")
@@ -431,8 +475,14 @@ def api_detections_toggle(rule_id: str):
 
 @app.post("/api/detections/test")
 def api_detections_test(req: schemas.InspectRequest):
-    """Run a prompt against the rules: which fire, and the resulting verdict."""
-    return {"hits": detloader.run(req.text, req.direction), "detection": engine.inspect(req.text, req.direction)}
+    """Run a prompt against an endpoint's armed rules: which fire and the verdict."""
+    ep = endpoints.get(req.endpoint) if req.endpoint else None
+    active = set(ep["rules"]) if ep else None
+    judge_on = ep["judge"] if ep else None
+    return {
+        "hits": detloader.run(req.text, req.direction, active),
+        "detection": engine.inspect(req.text, req.direction, active, judge_on),
+    }
 
 
 @app.post("/api/benchmark")
