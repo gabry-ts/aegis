@@ -13,6 +13,10 @@ endpoints:
   - tool_abuse
   - unbounded_consumption
   judge: false
+  upstream:
+    base_url: https://api.openai.com/v1
+    model: gpt-4o-mini-2024-07-18
+    api_key_env: OPENAI_API_KEY
 - slug: strict
   name: Strict
   description: Full rule library plus the LLM judge.
@@ -26,9 +30,17 @@ endpoints:
   - tool_abuse
   - unbounded_consumption
   judge: true
+  upstream: {}
 - slug: minimal
   name: Minimal
   description: A single rule — lightweight prompt-injection screen.
   rules:
   - prompt_injection
   judge: false
+  upstream: {}
+- slug: demo
+  name: demo
+  description: ''
+  rules: []
+  judge: false
+  upstream: {}
