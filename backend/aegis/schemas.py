@@ -183,3 +183,7 @@ class AssessRequest(BaseModel):
 
 class RawRules(BaseModel):
     text: str
+
+
+class AuditChatRequest(BaseModel):
+    question: str = ""

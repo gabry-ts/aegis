@@ -285,6 +285,78 @@ def api_score():
     return cscore.compute(store)
 
 
+_AUDIT_ASSISTANT_PROMPT = (
+    "You are the AEGIS audit assistant. You answer questions about the security and EU AI Act "
+    "compliance log of an LLM guardrail proxy. Use ONLY the AUDIT DATA provided below. If the "
+    "answer is not in the data, say you don't have it. Be concise and specific, cite event ids "
+    "as #NNN when relevant, and never invent numbers. Answer in short plain-text prose: no "
+    "markdown, no bold, no bullet characters."
+)
+
+
+def _audit_context(limit: int = 60) -> str:
+    """A compact, grounded snapshot of the audit trail for the assistant."""
+    from collections import Counter
+
+    events = store.all()
+    by_action = Counter(e.get("action") for e in events)
+    by_verdict = Counter(e.get("verdict") for e in events)
+    by_article = Counter(e.get("ai_act") for e in events if e.get("ai_act"))
+    summary = {
+        "total_events": len(events),
+        "by_action": dict(by_action),
+        "by_verdict": dict(by_verdict),
+        "by_ai_act_article": dict(by_article),
+        "ai_act_score_percent": cscore.compute(store).get("percent"),
+    }
+    recent = events[-limit:]
+    rows = [
+        f"#{e.get('id')} {e.get('ts', '')} actor={e.get('actor')} verdict={e.get('verdict')} "
+        f"action={e.get('action')} sev={e.get('severity')} ai_act={e.get('ai_act') or '-'} "
+        f"text={(e.get('excerpt') or '')[:90]!r}"
+        for e in recent
+    ]
+    return (
+        "AUDIT DATA\nsummary: " + json.dumps(summary, default=str)
+        + f"\n\nrecent events (last {len(recent)}):\n" + "\n".join(rows)
+    )
+
+
+@app.post("/api/audit/chat")
+def api_audit_chat(req: schemas.AuditChatRequest):
+    """Ask questions about the audit log. The assistant is itself guarded by AEGIS."""
+    question = (req.question or "").strip()
+    if not question:
+        return {"blocked": False, "answer": "Ask me anything about the audit trail."}
+
+    # Dogfooding: the assistant is an LLM app, so it runs behind the guardrail too.
+    # Rules only here (not the judge): questions about the log naturally mention
+    # "attack", "threat", "blocked" and would otherwise trip the model-based judge.
+    det = _inspect(question, "input")
+    if det["action"] == "BLOCKED" and det.get("rule_id") != "llm_judge":
+        _record(clog.make_event(det, actor="assistant"))
+        verdict = str(det["verdict"]).replace("_", " ")
+        return {
+            "blocked": True,
+            "verdict": det["verdict"],
+            "answer": (
+                f"That question was blocked by AEGIS ({verdict}). "
+                "Even this assistant runs behind the guardrail."
+            ),
+        }
+
+    try:
+        answer = llm.complete(
+            [
+                {"role": "system", "content": _AUDIT_ASSISTANT_PROMPT + "\n\n" + _audit_context()},
+                {"role": "user", "content": question},
+            ]
+        )
+    except Exception:
+        answer = "I couldn't reach the model right now. Try again in a moment."
+    return {"blocked": False, "verdict": det["verdict"], "answer": answer}
+
+
 @app.get("/api/frameworks")
 def api_frameworks():
     """OWASP LLM Top 10 (2025) coverage (live from enabled rules) + ATLAS mapping."""
