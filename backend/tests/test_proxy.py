@@ -4,12 +4,24 @@ All tests run fully offline in mock mode (config.use_regolo() is False),
 driving the FastAPI app through a TestClient.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from aegis import config
 from aegis.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _force_mock(monkeypatch):
+    """Pin the deterministic offline mock for every proxy test.
+
+    These tests exercise the planted-secret vulnerable bot, not a real model,
+    so they must not depend on the developer's .env (which may select Regolo).
+    """
+    monkeypatch.setattr(config, "MODE", "mock")
+    monkeypatch.setattr(config, "REGOLO_API_KEY", "")
 
 
 def test_guarded_injection_is_blocked():
