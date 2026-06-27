@@ -25,6 +25,13 @@ export const inspect = (text, direction = 'input') =>
 
 export const exportUrl = (format = 'json') => `/api/audit/export?format=${format}`
 
+export const auditChat = (question) =>
+  fetch('/api/audit/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  }).then(json)
+
 export const verify = () => fetch('/api/verify').then(json)
 export const getFrameworks = () => fetch('/api/frameworks').then(json)
 export const runBenchmark = () => fetch('/api/benchmark', { method: 'POST' }).then(json)
