@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { chat } from '../api.js'
-import { ActionBadge, ArtChip, Sev, VerdictBadge } from './primitives.jsx'
+import LiveFire from './LiveFire.jsx'
 
 const KIND_COLOR = {
   PROMPT_INJECTION: 'amber',
@@ -87,117 +87,8 @@ export default function AttackConsole({ attacks }) {
       </section>
 
       <section className="result">
-        {!res && (
-          <div className="result__hint">
-            <div className="result-diagram">
-              {['input', 'model', 'output', 'audit'].map((n, i) => (
-                <span key={n} style={{ display: 'contents' }}>
-                  {i > 0 && <span className="result-diagram__arrow">→</span>}
-                  <span className="result-diagram__node">
-                    <b />
-                    {n}
-                  </span>
-                </span>
-              ))}
-            </div>
-            <p>
-              Send a prompt and the input verdict, model reply, output scan and logged
-              audit events surface here in real time.
-            </p>
-          </div>
-        )}
-        {res?.error && (
-          <div className="verdict-card verdict-card--blocked">
-            <span className="vc__tag">REQUEST FAILED</span>
-            <span className="vc__text">Is the AEGIS backend running on :8000?</span>
-          </div>
-        )}
-        {res && !res.error && <ConsoleResult res={res} />}
+        <LiveFire res={res} guard={guard} loading={loading} prompt={text} />
       </section>
-    </div>
-  )
-}
-
-function ConsoleResult({ res }) {
-  if (!res.guard) {
-    const leaked = /AEGIS-|FLAG|secret|password/i.test(res.reply || '')
-    return (
-      <div className="stack-12">
-        <div className="verdict-card verdict-card--unprotected">
-          <span className="vc__tag">UNPROTECTED</span>
-          <span className="vc__text">
-            No guardrail in front of the model. It answered directly
-            {leaked ? ' and exposed confidential data.' : '.'}
-          </span>
-        </div>
-        <div className="reply reply--leak">{res.reply}</div>
-      </div>
-    )
-  }
-
-  const di = res.input_detection
-
-  if (res.blocked) {
-    return (
-      <div className="stack-12">
-        <div className="verdict-card verdict-card--blocked">
-          <span className="vc__tag">BLOCKED</span>
-          <div className="vc__body">
-            <div className="row gap-8 wrap">
-              <VerdictBadge verdict={di.verdict} />
-              <Sev value={di.severity} />
-              <ArtChip article={di.ai_act} />
-            </div>
-            <p className="vc__expl">{di.explanation}</p>
-            {di.matched?.length > 0 && (
-              <p className="vc__matched mono">matched: {di.matched.join(', ')}</p>
-            )}
-          </div>
-        </div>
-        <div className="reply reply--blocked">{res.reply}</div>
-        <EventsMini events={res.events} />
-      </div>
-    )
-  }
-
-  const out = res.output_detection
-  return (
-    <div className="stack-12">
-      <div className="verdict-card verdict-card--allowed">
-        <span className="vc__tag">INPUT PASSED</span>
-        <div className="row gap-8 wrap">
-          <VerdictBadge verdict={di.verdict} />
-          <Sev value={di.severity} />
-        </div>
-      </div>
-      <div className="reply">{res.reply}</div>
-      <div className={'scan-line scan-line--' + (res.sanitized ? 'amber' : 'green')}>
-        {res.sanitized ? (
-          <>
-            Output scan caught a leak → <b>sanitized</b> (
-            {String(out?.verdict || '').replace(/_/g, ' ')}). <ArtChip article={out?.ai_act} />
-          </>
-        ) : (
-          <>
-            Output scan clean. AI disclosure injected. <ArtChip article="Art.50" />
-          </>
-        )}
-      </div>
-      <EventsMini events={res.events} />
-    </div>
-  )
-}
-
-function EventsMini({ events = [] }) {
-  if (!events.length) return null
-  return (
-    <div className="events-mini">
-      <span className="events-mini__label">logged → audit</span>
-      {events.map((e) => (
-        <span className="events-mini__chip" key={e.id}>
-          <ActionBadge action={e.action} /> {e.ai_act || e.verdict}
-        </span>
-      ))}
     </div>
   )
 }
