@@ -170,11 +170,28 @@ class ChatRequest(BaseModel):
 class PlaygroundRequest(BaseModel):
     text: str
     guard: bool = True
+    slug: Optional[str] = None
 
 
 class InspectRequest(BaseModel):
     text: str
     direction: str = "input"
+    endpoint: Optional[str] = None
+
+
+class EndpointCreate(BaseModel):
+    name: str
+    slug: Optional[str] = None
+    description: str = ""
+    rules: List[str] = []
+    judge: bool = False
+
+
+class EndpointUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    rules: Optional[List[str]] = None
+    judge: Optional[bool] = None
 
 
 class AssessRequest(BaseModel):

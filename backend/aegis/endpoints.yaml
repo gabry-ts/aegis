@@ -1,0 +1,34 @@
+version: 1
+endpoints:
+- slug: default
+  name: Default
+  description: Full rule library, no LLM judge.
+  rules:
+  - prompt_injection
+  - jailbreak
+  - data_exfiltration
+  - system_prompt_extraction
+  - secret_leak
+  - pii_leak
+  - tool_abuse
+  - unbounded_consumption
+  judge: false
+- slug: strict
+  name: Strict
+  description: Full rule library plus the LLM judge.
+  rules:
+  - prompt_injection
+  - jailbreak
+  - data_exfiltration
+  - system_prompt_extraction
+  - secret_leak
+  - pii_leak
+  - tool_abuse
+  - unbounded_consumption
+  judge: true
+- slug: minimal
+  name: Minimal
+  description: A single rule — lightweight prompt-injection screen.
+  rules:
+  - prompt_injection
+  judge: false
