@@ -16,6 +16,7 @@ export default function Rules() {
   const [testing, setTesting] = useState(false)
   const [hitIds, setHitIds] = useState(() => new Set())
   const [judge, setJudge] = useState({ enabled: false, available: false })
+  const [resetKey, setResetKey] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -118,8 +119,8 @@ export default function Rules() {
         <h1 className="page-title">Detection Rules</h1>
         <p className="page-sub">
           The guardrail as a board. Each block is a detector wired to the stage where it runs:
-          drag to arrange, toggle to arm, click to edit. Every change is validated before it
-          touches the live engine.
+          drag to arrange (the layout is saved automatically), toggle to arm, click to edit.
+          Every change is validated before it touches the live engine.
         </p>
       </div>
 
@@ -173,6 +174,17 @@ export default function Rules() {
             </span>
           )}
           {dirty && <span className="rules-dirty">unsaved changes</span>}
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              setResetKey((k) => k + 1)
+              toast('Board layout reset', 'info')
+            }}
+            title="Restore the default tidy arrangement"
+          >
+            Reset layout
+          </button>
           <button type="button" className="btn btn--ghost" onClick={onAdd}>
             + Add rule
           </button>
@@ -193,6 +205,7 @@ export default function Rules() {
           hitIds={hitIds}
           selectedId={selectedId}
           judge={judge}
+          resetKey={resetKey}
           onSelect={setSelectedId}
           onToggle={onToggle}
           onToggleJudge={onToggleJudge}

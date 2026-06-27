@@ -1,21 +1,25 @@
 // The block editor. Renders the pipeline backbone plus one draggable detector
-// node per rule, wired to the stage it runs at. Node positions persist to
-// localStorage so a rearranged board survives reloads.
+// node per rule, wired to the stage it runs at, over living connections.
+// Node positions persist to localStorage so a rearranged board survives reloads.
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { ReactFlow, Background, BackgroundVariant, Controls, useNodesState } from '@xyflow/react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ReactFlow,
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  useNodesState,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nodeTypes } from './RuleNodes.jsx'
-import {
-  STAGES,
-  stagePosition,
-  judgePosition,
-  defaultRulePosition,
-  ACTION_COLOR,
-} from './rulesYaml.js'
+import { edgeTypes } from './FlowEdge.jsx'
+import { STAGES, stagePosition, judgePosition, defaultRulePosition, ACTION_COLOR } from './rulesYaml.js'
+import { toast } from '../../toast.js'
 
 const POS_KEY = 'aegis.rules.positions.v1'
-const SIGNAL = {
+
+const MINI_COLOR = {
   red: 'var(--red)',
   amber: 'var(--amber)',
   blue: 'var(--blue)',
@@ -66,12 +70,7 @@ function buildNodes(rules, positions, hitIds, selectedId, onToggle, judge, onTog
       id: `rule:${rule.id}`,
       type: 'rule',
       position: positions[rule.id] || defaultRulePosition(rule.surface, i),
-      data: {
-        rule,
-        hit: hitIds.has(rule.id),
-        selected: selectedId === rule.id,
-        onToggle,
-      },
+      data: { rule, hit: hitIds.has(rule.id), selected: selectedId === rule.id, onToggle },
       deletable: false,
     }
   })
@@ -79,7 +78,7 @@ function buildNodes(rules, positions, hitIds, selectedId, onToggle, judge, onTog
   return [...stages, judgeNode, ...ruleNodes]
 }
 
-function buildEdges(rules, hitIds, judge) {
+function buildEdges(rules, hitIds, judge, activeId) {
   const edges = []
   for (let i = 0; i < STAGES.length - 1; i++) {
     edges.push({
@@ -88,25 +87,24 @@ function buildEdges(rules, hitIds, judge) {
       target: `stage:${STAGES[i + 1].id}`,
       sourceHandle: 'r',
       targetHandle: 'l',
-      type: 'smoothstep',
-      style: { stroke: 'var(--line-2)', strokeWidth: 2 },
+      type: 'flow',
+      data: { variant: 'spine', color: 'muted' },
     })
   }
   for (const rule of rules) {
-    const color = ACTION_COLOR[rule.action] || 'muted'
-    const hit = hitIds.has(rule.id)
     edges.push({
       id: `re:${rule.id}`,
       source: `stage:${anchorOf(rule.surface)}`,
       sourceHandle: 'b',
       target: `rule:${rule.id}`,
       targetHandle: 't',
-      type: 'smoothstep',
-      animated: hit,
-      style: {
-        stroke: SIGNAL[color],
-        strokeWidth: hit ? 2.4 : 1.6,
-        opacity: rule.enabled ? 1 : 0.35,
+      type: 'flow',
+      data: {
+        variant: 'rule',
+        color: ACTION_COLOR[rule.action] || 'muted',
+        hit: hitIds.has(rule.id),
+        active: activeId === rule.id,
+        enabled: rule.enabled,
       },
     })
   }
@@ -116,14 +114,8 @@ function buildEdges(rules, hitIds, judge) {
     sourceHandle: 'b',
     target: 'judge',
     targetHandle: 't',
-    type: 'smoothstep',
-    animated: !!judge?.enabled,
-    style: {
-      stroke: 'var(--iris)',
-      strokeWidth: 1.8,
-      strokeDasharray: '5 4',
-      opacity: judge?.enabled ? 1 : 0.4,
-    },
+    type: 'flow',
+    data: { variant: 'judge', color: 'iris', enabled: !!judge?.enabled, active: !!judge?.enabled },
   })
   return edges
 }
@@ -133,20 +125,31 @@ export default function RuleCanvas({
   hitIds,
   selectedId,
   judge,
+  resetKey = 0,
   onSelect,
   onToggle,
   onToggleJudge,
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
+  const [hoverId, setHoverId] = useState(null)
   const positionsRef = useRef(loadPositions())
+  const draggedOnce = useRef(false)
 
   useEffect(() => {
-    setNodes(
-      buildNodes(rules, positionsRef.current, hitIds, selectedId, onToggle, judge, onToggleJudge),
-    )
+    setNodes(buildNodes(rules, positionsRef.current, hitIds, selectedId, onToggle, judge, onToggleJudge))
   }, [rules, hitIds, selectedId, onToggle, judge, onToggleJudge, setNodes])
 
-  const edges = useMemo(() => buildEdges(rules, hitIds, judge), [rules, hitIds, judge])
+  // Reset layout: clear saved positions and re-lay the board.
+  useEffect(() => {
+    if (!resetKey) return
+    positionsRef.current = {}
+    savePositions({})
+    setNodes(buildNodes(rules, {}, hitIds, selectedId, onToggle, judge, onToggleJudge))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey])
+
+  const activeId = hoverId || selectedId
+  const edges = useMemo(() => buildEdges(rules, hitIds, judge, activeId), [rules, hitIds, judge, activeId])
 
   const onNodeClick = useCallback(
     (_e, node) => {
@@ -154,6 +157,11 @@ export default function RuleCanvas({
     },
     [onSelect],
   )
+
+  const onNodeMouseEnter = useCallback((_e, node) => {
+    if (node.type === 'rule') setHoverId(node.id.slice(5))
+  }, [])
+  const onNodeMouseLeave = useCallback(() => setHoverId(null), [])
 
   const onNodeDragStop = useCallback((_e, node) => {
     if (node.type === 'rule') {
@@ -164,6 +172,16 @@ export default function RuleCanvas({
       return
     }
     savePositions(positionsRef.current)
+    if (!draggedOnce.current) {
+      draggedOnce.current = true
+      toast('Layout saved automatically', 'info')
+    }
+  }, [])
+
+  const miniColor = useCallback((n) => {
+    if (n.type === 'judge') return 'var(--iris)'
+    if (n.type === 'rule') return MINI_COLOR[ACTION_COLOR[n.data?.rule?.action]] || 'var(--line-2)'
+    return 'var(--surface-3)'
   }, [])
 
   return (
@@ -173,7 +191,10 @@ export default function RuleCanvas({
         edges={edges}
         onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onNodeDragStop={onNodeDragStop}
         onPaneClick={() => onSelect(null)}
         colorMode="dark"
@@ -185,6 +206,14 @@ export default function RuleCanvas({
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.4} color="var(--line)" />
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={miniColor}
+          nodeStrokeWidth={0}
+          nodeBorderRadius={3}
+          maskColor="oklch(0.165 0.012 265 / 0.72)"
+        />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>
