@@ -9,6 +9,7 @@ import Benchmark from './pages/Benchmark.jsx'
 import Assessment from './pages/Assessment.jsx'
 import Rules from './pages/Rules.jsx'
 import Toaster from './components/Toaster.jsx'
+import Assistant from './components/Assistant.jsx'
 
 const SECTIONS = [
   {
@@ -140,6 +141,7 @@ export default function App() {
         </Routes>
       </main>
 
+      <Assistant />
       <Toaster />
     </div>
   )
