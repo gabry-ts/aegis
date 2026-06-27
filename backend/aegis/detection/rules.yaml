@@ -1,0 +1,133 @@
+version: 1
+rules:
+- id: prompt_injection
+  name: Prompt Injection
+  verdict: PROMPT_INJECTION
+  severity: 4
+  surface: input
+  action: block
+  detector: regex
+  patterns:
+  - (?i)ignore (all )?(previous|prior|above) (instructions|rules)
+  - (?i)disregard (the )?(rules|instructions) (above|below)
+  - (?i)forget your (prior|previous) rules
+  - (?i)(print|reveal|show)( me)? your (hidden |system )?(instructions|rules|system
+    prompt|prompt)
+  - (?i)from now on,? you must obey only
+  mapping:
+    owasp: LLM01:2025
+    atlas: AML.T0051
+    ai_act: Art.15(5)
+  enabled: true
+- id: jailbreak
+  name: Jailbreak
+  verdict: JAILBREAK
+  severity: 4
+  surface: input
+  action: block
+  detector: regex
+  patterns:
+  - (?i)\bDAN\b
+  - (?i)do anything now
+  - (?i)developer mode
+  - (?i)no (restrictions|content policy)
+  - (?i)disable (all )?(your |of your )?safety (filters|guardrails)
+  - (?i)pretend you are an? (unfiltered|unrestricted)
+  mapping:
+    owasp: LLM01:2025
+    atlas: AML.T0054
+    ai_act: Art.15(5)
+  enabled: true
+- id: data_exfiltration
+  name: Data Exfiltration
+  verdict: DATA_EXFILTRATION
+  severity: 4
+  surface: input
+  action: block
+  detector: regex
+  patterns:
+  - (?i)exfiltrat
+  - (?i)send (all )?.*(to )?https?://
+  - (?i)(send|leak|post) .*environment variables
+  - (?i)(list|reveal|dump) (every |all )?(internal )?api key
+  - (?i)base64 (your|the) .*(config|system)
+  mapping:
+    owasp: LLM02:2025
+    atlas: AML.T0057
+    ai_act: Art.15(5)
+  enabled: true
+- id: system_prompt_extraction
+  name: System Prompt Extraction
+  verdict: SECRET_LEAK
+  severity: 4
+  surface: input
+  action: block
+  detector: regex
+  patterns:
+  - (?i)reveal (the )?secret
+  - (?i)what are your (exact )?(system )?(instructions|rules)
+  - (?i)reveal your rules
+  - (?i)secret value (stored )?in your system prompt
+  mapping:
+    owasp: LLM07:2025
+    atlas: AML.T0056
+    ai_act: Art.15(5)
+  enabled: true
+- id: secret_leak
+  name: Secret Leakage
+  verdict: SECRET_LEAK
+  severity: 5
+  surface: output
+  action: sanitize
+  detector: secret
+  mapping:
+    owasp: LLM07:2025
+    atlas: AML.T0056
+    ai_act: Art.15(5)
+  enabled: true
+- id: pii_leak
+  name: PII Leakage
+  verdict: PII_LEAK
+  severity: 4
+  surface: output
+  action: sanitize
+  detector: pii
+  mapping:
+    owasp: LLM02:2025
+    atlas: AML.T0057
+    ai_act: Art.15(5)
+  enabled: true
+- id: tool_abuse
+  name: Tool / Function Abuse
+  verdict: EXCESSIVE_AGENCY
+  severity: 4
+  surface: input
+  action: block
+  detector: keyword
+  keywords:
+  - call the function
+  - execute shell
+  - use the http tool
+  - delete all records
+  - run command
+  - rm -rf
+  mapping:
+    owasp: LLM06:2025
+    atlas: ''
+    ai_act: Art.15(5)
+  enabled: true
+- id: unbounded_consumption
+  name: Unbounded Consumption
+  verdict: RESOURCE_ABUSE
+  severity: 3
+  surface: input
+  action: flag
+  detector: regex
+  patterns:
+  - (?i)repeat (this|the following|after me).*(forever|1000|10000) (times)?
+  - (?i)(write|generate) .*(10000|100000) (words|times)
+  mapping:
+    owasp: LLM10:2025
+    atlas: ''
+    ai_act: Art.15(5)
+  enabled: true
