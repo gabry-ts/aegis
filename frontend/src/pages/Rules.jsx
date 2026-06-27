@@ -1,9 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getDetections, saveDetectionsRaw, testDetection, toggleJudge } from '../api.js'
 import RuleCanvas from '../components/rules/RuleCanvas.jsx'
+import RuleList from '../components/rules/RuleList.jsx'
 import RuleInspector from '../components/rules/RuleInspector.jsx'
 import { blankRule, rulesToYaml } from '../components/rules/rulesYaml.js'
 import { toast } from '../toast.js'
+
+function useNarrow() {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 760px)')
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
 
 export default function Rules() {
   const [rules, setRules] = useState([])
@@ -17,6 +31,7 @@ export default function Rules() {
   const [hitIds, setHitIds] = useState(() => new Set())
   const [judge, setJudge] = useState({ enabled: false, available: false })
   const [resetKey, setResetKey] = useState(0)
+  const narrow = useNarrow()
 
   const load = useCallback(async () => {
     try {
@@ -200,16 +215,26 @@ export default function Rules() {
       </div>
 
       <div className="rules-workspace">
-        <RuleCanvas
-          rules={rules}
-          hitIds={hitIds}
-          selectedId={selectedId}
-          judge={judge}
-          resetKey={resetKey}
-          onSelect={setSelectedId}
-          onToggle={onToggle}
-          onToggleJudge={onToggleJudge}
-        />
+        {narrow ? (
+          <RuleList
+            rules={rules}
+            hitIds={hitIds}
+            selectedId={selectedId}
+            onToggle={onToggle}
+            onSelect={setSelectedId}
+          />
+        ) : (
+          <RuleCanvas
+            rules={rules}
+            hitIds={hitIds}
+            selectedId={selectedId}
+            judge={judge}
+            resetKey={resetKey}
+            onSelect={setSelectedId}
+            onToggle={onToggle}
+            onToggleJudge={onToggleJudge}
+          />
+        )}
         {selectedRule && (
           <RuleInspector
             rule={selectedRule}

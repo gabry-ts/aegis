@@ -18,6 +18,7 @@ export default function AttackConsole({ attacks }) {
   const [loading, setLoading] = useState(false)
   const [res, setRes] = useState(null)
   const [playing, setPlaying] = useState(false)
+  const [playInfo, setPlayInfo] = useState(null)
 
   const runIdRef = useRef(0)
   const playingRef = useRef(false)
@@ -51,6 +52,7 @@ export default function AttackConsole({ attacks }) {
   const stopPlay = () => {
     playingRef.current = false
     setPlaying(false)
+    setPlayInfo(null)
   }
 
   const send = async () => {
@@ -71,6 +73,7 @@ export default function AttackConsole({ attacks }) {
       }
       const a = list[i % list.length]
       const myId = (runIdRef.current += 1)
+      setPlayInfo({ i: (i % list.length) + 1, total: list.length, label: a.label })
       setText(a.text)
       setGuard(true)
       await fire(a.text, true, myId)
@@ -84,6 +87,7 @@ export default function AttackConsole({ attacks }) {
     if (playingRef.current) {
       playingRef.current = false
       setPlaying(false)
+      setPlayInfo(null)
       runIdRef.current += 1
       setLoading(false)
     } else {
@@ -155,6 +159,13 @@ export default function AttackConsole({ attacks }) {
             </button>
           </div>
         </div>
+
+        {playing && playInfo && (
+          <p className="console__playinfo mono">
+            ▶ Auto-play · {playInfo.i}/{playInfo.total} · {playInfo.label}
+            <span className="c-muted"> · protection forced on</span>
+          </p>
+        )}
 
         {!guard && (
           <p className="console__warn">

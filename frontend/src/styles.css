@@ -276,7 +276,7 @@ button {
   font-size: 0.58rem;
   letter-spacing: 0.03em;
   line-height: 1;
-  color: var(--faint);
+  color: var(--muted);
   transition: color var(--t);
 }
 .tab:hover .tab__label {
@@ -286,7 +286,7 @@ button {
   color: var(--ink);
 }
 .tab--active .tab__sub {
-  color: var(--muted);
+  color: var(--ink-2);
 }
 .tab--active::after {
   content: '';
@@ -908,7 +908,7 @@ input[type='text']:focus-visible {
 .feed-row__time {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--faint);
+  color: var(--muted);
   padding-top: 3px;
   white-space: nowrap;
 }
@@ -1450,6 +1450,11 @@ input[type='text']:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.console__playinfo {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--iris-ink);
 }
 .console__warn {
   margin: 0;
@@ -2589,11 +2594,15 @@ input[type='text']:focus-visible {
 
 .rules-workspace {
   position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
 }
 .rule-canvas {
   position: relative;
   height: clamp(480px, 66vh, 780px);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -2737,6 +2746,96 @@ input[type='text']:focus-visible {
 .rule-canvas .react-flow__minimap-mask {
   stroke: var(--line-2);
   stroke-width: 1;
+}
+
+/* ----- accessible rule list (mobile / keyboard fallback) ----- */
+.rule-mlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rule-mrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--surface);
+  transition: border-color var(--t), box-shadow var(--t), opacity var(--t);
+}
+.rule-mrow.is-off {
+  opacity: 0.55;
+}
+.rule-mrow.is-sel {
+  border-color: var(--iris);
+  box-shadow: var(--glow-iris);
+}
+.rule-mrow.is-hit {
+  border-color: var(--green);
+}
+.rule-mtoggle {
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border-radius: 100px;
+  background: var(--surface-3);
+  border: 1px solid var(--line-2);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--t), border-color var(--t);
+}
+.rule-mtoggle__dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform var(--t) var(--ease), background var(--t);
+}
+.rule-mtoggle.is-on {
+  background: var(--iris-fill);
+  border-color: var(--iris);
+}
+.rule-mtoggle.is-on .rule-mtoggle__dot {
+  transform: translateX(18px);
+  background: var(--iris);
+}
+.rule-mmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.rule-mrow__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rule-mname {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.rule-mrow__meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* stage node */
@@ -3004,12 +3103,10 @@ input[type='text']:focus-visible {
 
 /* inspector drawer */
 .inspector {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
+  position: relative;
   width: 348px;
-  max-width: calc(100% - 24px);
+  flex-shrink: 0;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   background: color-mix(in oklab, var(--surface-2) 92%, transparent);
@@ -3172,12 +3269,13 @@ input[type='text']:focus-visible {
   .assess-result {
     position: static;
   }
+  .rules-workspace {
+    flex-direction: column;
+  }
   .inspector {
-    left: 12px;
     width: auto;
-    max-width: none;
-    top: auto;
-    height: 62%;
+    align-self: auto;
+    max-height: 60vh;
   }
 }
 @media (max-width: 760px) {
@@ -3252,7 +3350,7 @@ input[type='text']:focus-visible {
 .livefire {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   flex: 1;
 }
 
@@ -3327,8 +3425,8 @@ input[type='text']:focus-visible {
 .lf-spine {
   position: absolute;
   left: 16px;
-  top: 27px;
-  bottom: 27px;
+  top: 22px;
+  bottom: 22px;
   width: 2px;
   border-radius: 2px;
   background: var(--line);
@@ -3340,7 +3438,7 @@ input[type='text']:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 54px;
+  min-height: 44px;
 }
 .lf-stage__icon {
   position: relative;
@@ -3372,7 +3470,7 @@ input[type='text']:focus-visible {
 }
 .lf-stage__sub {
   font-size: 0.64rem;
-  color: var(--faint);
+  color: var(--muted);
   letter-spacing: 0.02em;
 }
 .lf-stage__read {
@@ -3516,7 +3614,7 @@ input[type='text']:focus-visible {
 .lf-readout {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .lf-reveal {
   will-change: opacity, transform;
@@ -3612,6 +3710,8 @@ input[type='text']:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 13px 15px;
+  max-height: 156px;
+  overflow-y: auto;
 }
 .lf-reply__body {
   margin: 0;
