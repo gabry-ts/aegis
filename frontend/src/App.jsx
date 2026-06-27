@@ -4,7 +4,6 @@ import { getStats } from './api.js'
 import Dashboard from './pages/Dashboard.jsx'
 import Integrity from './pages/Integrity.jsx'
 import Playground from './pages/Playground.jsx'
-import Benchmark from './pages/Benchmark.jsx'
 import Assessment from './pages/Assessment.jsx'
 import Rules from './pages/Rules.jsx'
 import Toaster from './components/Toaster.jsx'
@@ -15,13 +14,10 @@ const SECTIONS = [
   { label: 'Playground', caption: 'attack it live', base: '/playground', paths: ['/playground'], subs: [] },
   {
     label: 'Guardrail',
-    caption: 'rules & coverage',
+    caption: 'detection rules',
     base: '/detections',
-    paths: ['/detections', '/benchmark'],
-    subs: [
-      { to: '/detections', label: 'Rules' },
-      { to: '/benchmark', label: 'Benchmark' },
-    ],
+    paths: ['/detections'],
+    subs: [],
   },
   {
     label: 'Compliance',
@@ -128,10 +124,10 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/detections" element={<Rules />} />
-          <Route path="/benchmark" element={<Benchmark />} />
           <Route path="/integrity" element={<Integrity />} />
           <Route path="/assessment" element={<Assessment />} />
           <Route path="/pipeline" element={<Navigate to="/playground" replace />} />
+          <Route path="/benchmark" element={<Navigate to="/detections" replace />} />
         </Routes>
       </main>
 
