@@ -4306,6 +4306,23 @@ input[type='text']:focus-visible {
   flex-direction: column;
   gap: 5px;
 }
+.uppanel-field--full {
+  margin-bottom: 2px;
+}
+.uppanel-field--full input {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  max-width: 360px;
+}
+.uppanel-field--full input:focus-visible {
+  outline: none;
+  border-color: var(--iris-line);
+  box-shadow: var(--glow-iris);
+}
 .uppanel-field__label {
   font-size: 11px;
   letter-spacing: 0.07em;

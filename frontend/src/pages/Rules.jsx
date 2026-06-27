@@ -65,6 +65,7 @@ export default function Rules() {
   const [newName, setNewName] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const [showUpstream, setShowUpstream] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
   const [upstreamDraft, setUpstreamDraft] = useState({ base_url: '', model: '', api_key_env: '' })
   const narrow = useNarrow()
   const loadedSlugRef = useRef(null)
@@ -94,6 +95,7 @@ export default function Rules() {
     loadedSlugRef.current = currentEp.slug
     setArmed(new Set(currentEp.rules || []))
     setJudge(!!currentEp.judge)
+    setNameDraft(currentEp.name || '')
     const up = currentEp.upstream || {}
     setUpstreamDraft({
       base_url: up.base_url || '',
@@ -251,11 +253,12 @@ export default function Rules() {
     }
   }
 
-  const saveUpstream = async () => {
+  const saveSettings = async () => {
     if (!current || busy) return
     setBusy(true)
     try {
       const u = await updateEndpoint(current, {
+        name: nameDraft.trim() || currentEp.name,
         upstream: {
           base_url: upstreamDraft.base_url.trim() || null,
           model: upstreamDraft.model.trim() || null,
@@ -265,9 +268,9 @@ export default function Rules() {
       if (u.ok) {
         await refreshEndpoints()
         setShowUpstream(false)
-        toast('Upstream saved', 'success')
+        toast('Endpoint saved', 'success')
       } else {
-        toast(u.error || 'Could not save upstream', 'error')
+        toast(u.error || 'Could not save endpoint', 'error')
       }
     } catch {
       toast('Request failed', 'error')
@@ -324,7 +327,7 @@ export default function Rules() {
             type="button"
             className={'rules-epbar__target mono small' + (showUpstream ? ' is-open' : '')}
             onClick={() => setShowUpstream((s) => !s)}
-            title="Configure where this endpoint forwards passing requests"
+            title="Edit this endpoint's name and upstream target"
           >
             {upstreamLabel(currentEp.upstream)}
           </button>
@@ -386,12 +389,22 @@ export default function Rules() {
       {showUpstream && currentEp && (
         <div className="rules-uppanel">
           <div className="rules-uppanel__head">
-            <span className="rules-uppanel__title mono">UPSTREAM · where passing requests go</span>
+            <span className="rules-uppanel__title mono">ENDPOINT · name &amp; upstream</span>
             <span className="c-faint small">
-              Leave empty to use the global backend. The API key is read from the named environment
-              variable — the secret never leaves your .env.
+              Rename the endpoint and choose where passing requests go. Leave the upstream empty to
+              use the global backend; the API key is read from the named environment variable — the
+              secret never leaves your .env.
             </span>
           </div>
+          <label className="uppanel-field uppanel-field--full">
+            <span className="uppanel-field__label">Name</span>
+            <input
+              type="text"
+              placeholder="Endpoint name"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+            />
+          </label>
           <div className="rules-uppanel__grid">
             <label className="uppanel-field">
               <span className="uppanel-field__label">Base URL</span>
@@ -437,8 +450,8 @@ export default function Rules() {
               <button type="button" className="btn btn--ghost" onClick={() => setShowUpstream(false)}>
                 Cancel
               </button>
-              <button type="button" className="btn btn--primary" onClick={saveUpstream} disabled={busy}>
-                Save upstream
+              <button type="button" className="btn btn--primary" onClick={saveSettings} disabled={busy}>
+                Save endpoint
               </button>
             </div>
           </div>
