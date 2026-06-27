@@ -31,11 +31,11 @@ export default function Integrity() {
         if (r.ok) {
           setPhase('verified')
           setBrokenAt(null)
-          toast(`Chain verified — ${r.count} blocks intact`, 'success')
+          toast(`Chain verified — ${r.count} records intact`, 'success')
         } else {
           setPhase('broken')
           setBrokenAt(r.broken_at ?? null)
-          toast(`Integrity broken at block #${r.broken_at}`, 'error')
+          toast(`Integrity broken at record #${r.broken_at}`, 'error')
         }
         setBusy(false)
       }, 240)
@@ -74,26 +74,50 @@ export default function Integrity() {
     setBusy(false)
   }
 
-  let banner = null
-  if (phase === 'verified') banner = { cls: 'is-ok', text: `CHAIN VERIFIED — ${events.length} BLOCKS INTACT` }
-  else if (phase === 'broken')
-    banner = {
-      cls: 'is-broken',
-      text:
-        brokenAt != null
-          ? `INTEGRITY BROKEN AT BLOCK #${String(brokenAt).padStart(3, '0')}`
-          : 'INTEGRITY BROKEN',
-    }
-  else if (phase === 'verifying') banner = { cls: 'is-busy', text: 'VERIFYING…' }
+  const broken = phase === 'broken'
+  const verifying = phase === 'verifying'
+  const heroState = broken ? 'is-broken' : verifying ? 'is-busy' : 'is-ok'
 
   return (
     <div className="page">
       <div className="page__head">
-        <h1 className="page-title">Integrity</h1>
+        <h1 className="page-title">Audit integrity</h1>
         <p className="page-sub">
-          Every audit record seals the previous one in a SHA-256 hash chain (Art. 12). Verify the
-          whole chain, or tamper with a record and watch exactly where it breaks.
+          The tamper-evident record behind every compliance claim — required by the EU AI Act,
+          Art. 12.
         </p>
+      </div>
+
+      <div className={'integrity-hero ' + heroState}>
+        <span className="integrity-hero__badge" aria-hidden="true">
+          {broken ? (
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3l9 16H3z" />
+              <path d="M12 10v4M12 17v.5" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24">
+              <path d="M6 11h12v8H6zM8.5 11V8a3.5 3.5 0 017 0v3" />
+            </svg>
+          )}
+        </span>
+        <div className="integrity-hero__body">
+          <div className="integrity-hero__title">
+            {broken
+              ? `Tampering detected — the chain broke at record #${String(brokenAt).padStart(3, '0')}`
+              : verifying
+                ? 'Re-hashing every record…'
+                : `${events.length} records sealed · chain intact`}
+          </div>
+          <p className="integrity-hero__text">
+            {broken
+              ? `Record #${String(brokenAt).padStart(3, '0')} was altered, so its hash no longer matches — and every record after it is now invalid. There is no way to hide it.`
+              : 'Each record is locked to the one before it with a SHA-256 hash, like a blockchain. Change any single record and every record after it stops matching — so this log cannot be quietly edited.'}
+          </p>
+        </div>
+        <span className="integrity-hero__state mono">
+          {broken ? '✕ BROKEN' : verifying ? '…' : '✓ INTACT'}
+        </span>
       </div>
 
       <div className="integrity-bar">
@@ -106,7 +130,9 @@ export default function Integrity() {
         <button className="btn btn--ghost" onClick={runReset} disabled={busy}>
           Reset chain
         </button>
-        {banner && <span className={'integrity-banner ' + banner.cls}>{banner.text}</span>}
+        <span className="integrity-hint">
+          Tamper with a record, then watch the chain break exactly where it was touched.
+        </span>
       </div>
 
       <HashChain events={events} phase={phase} brokenAt={brokenAt} />

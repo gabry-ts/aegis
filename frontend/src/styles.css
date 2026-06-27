@@ -2106,6 +2106,110 @@ input[type='text']:focus-visible {
 /* ============================================================
    Integrity / hash chain
    ============================================================ */
+.integrity-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+  transition: border-color var(--t), background var(--t);
+}
+.integrity-hero.is-ok {
+  border-color: var(--green-line);
+  background: color-mix(in oklab, var(--green) 6%, var(--surface));
+}
+.integrity-hero.is-broken {
+  border-color: var(--red);
+  background: var(--red-fill);
+  box-shadow: 0 0 40px -16px oklch(0.66 0.2 25 / 0.6);
+}
+.integrity-hero.is-busy {
+  border-color: var(--iris-line);
+}
+.integrity-hero__badge {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid var(--green-line);
+  color: var(--green);
+  background: color-mix(in oklab, var(--green) 12%, var(--surface));
+}
+.integrity-hero.is-broken .integrity-hero__badge {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-fill);
+}
+.integrity-hero.is-busy .integrity-hero__badge {
+  border-color: var(--iris-line);
+  color: var(--iris-ink);
+  background: var(--iris-fill);
+}
+.integrity-hero__badge svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.integrity-hero__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.integrity-hero__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.integrity-hero.is-broken .integrity-hero__title {
+  color: var(--red);
+}
+.integrity-hero__text {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--ink-2);
+  max-width: 84ch;
+  text-wrap: pretty;
+}
+.integrity-hero__state {
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 5px 11px;
+  border-radius: 100px;
+  color: var(--green);
+  border: 1px solid var(--green-line);
+  background: var(--green-fill);
+  white-space: nowrap;
+}
+.integrity-hero.is-broken .integrity-hero__state {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-fill);
+}
+.integrity-hero.is-busy .integrity-hero__state {
+  color: var(--iris-ink);
+  border-color: var(--iris-line);
+  background: var(--iris-fill);
+}
+.integrity-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .integrity-bar {
   display: flex;
   align-items: center;
@@ -2200,6 +2304,47 @@ input[type='text']:focus-visible {
 }
 .chain-block.is-broken .chain-block__hash.is-self {
   color: var(--red);
+}
+.chain-caption {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  letter-spacing: 0.02em;
+}
+.chain-block.is-sealed {
+  border-color: var(--line-2);
+}
+.chain-block__seal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  color: var(--green);
+}
+.chain-block__lock {
+  display: grid;
+  place-items: center;
+}
+.chain-block__lock svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+.chain-block.is-broken .chain-block__seal {
+  color: var(--red);
+}
+.chain-block.is-stale .chain-block__seal {
+  color: var(--amber);
 }
 
 /* ============================================================
