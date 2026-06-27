@@ -62,6 +62,14 @@ def _record(event: dict) -> dict:
     return stored
 
 
+def _events(endpoint: str = None) -> list:
+    """All audit events, optionally narrowed to a single endpoint slug."""
+    events = store.all()
+    if endpoint:
+        events = [e for e in events if e.get("endpoint") == endpoint]
+    return events
+
+
 def _inspect(text: str, direction: str, active_ids=None, judge_enabled=None) -> dict:
     """Inspect with the configured failure policy (fail-closed vs fail-open).
 
@@ -234,18 +242,21 @@ def api_inspect(req: schemas.InspectRequest):
 # ---- Event feed / audit / compliance ------------------------------------
 
 @app.get("/api/events")
-def api_events(since: int = 0, limit: int = 100):
-    return store.recent(limit=limit, since=since)
+def api_events(since: int = 0, limit: int = 100, endpoint: str = None):
+    events = store.recent(limit=limit, since=since)
+    if endpoint:
+        events = [e for e in events if e.get("endpoint") == endpoint]
+    return events
 
 
 @app.get("/api/audit")
-def api_audit():
-    return store.all()
+def api_audit(endpoint: str = None):
+    return _events(endpoint)
 
 
 @app.get("/api/audit/export")
-def api_export(format: str = "json"):
-    events = store.all()
+def api_export(format: str = "json", endpoint: str = None):
+    events = _events(endpoint)
     if format == "csv":
         return PlainTextResponse(
             cexport.to_csv(events), media_type="text/csv",
@@ -303,8 +314,8 @@ def demo_reset():
 
 
 @app.get("/api/score")
-def api_score():
-    return cscore.compute(store)
+def api_score(endpoint: str = None):
+    return cscore.compute(_events(endpoint))
 
 
 _AUDIT_ASSISTANT_PROMPT = (
@@ -329,7 +340,7 @@ def _audit_context(limit: int = 60) -> str:
         "by_action": dict(by_action),
         "by_verdict": dict(by_verdict),
         "by_ai_act_article": dict(by_article),
-        "ai_act_score_percent": cscore.compute(store).get("percent"),
+        "ai_act_score_percent": cscore.compute(store.all()).get("percent"),
     }
     recent = events[-limit:]
     rows = [
@@ -441,32 +452,39 @@ def api_assess(req: schemas.AssessRequest):
     return aiact.classify(req.answers)
 
 
-def _full_stats() -> dict:
-    stats = store.stats()
+def _full_stats(endpoint: str = None) -> dict:
+    events = _events(endpoint)
+    stats = clog.aggregate_stats(events)
     stats["provider"] = llm.provider_info()
-    stats["score"] = cscore.compute(store)
+    stats["score"] = cscore.compute(events)
     return stats
 
 
 @app.get("/api/stats")
-def api_stats():
-    return _full_stats()
+def api_stats(endpoint: str = None):
+    return _full_stats(endpoint)
 
 
 @app.get("/api/stream")
-async def api_stream():
-    """Server-Sent Events fed by the event bus (in-memory or Redis pub/sub)."""
+async def api_stream(endpoint: str = None):
+    """Server-Sent Events fed by the event bus (in-memory or Redis pub/sub).
+
+    With ?endpoint=<slug> the feed and its rolling stats are scoped to that
+    endpoint; without it the stream carries every endpoint (the global view).
+    """
 
     def _sse(payload: dict) -> str:
         return "data: " + json.dumps(payload) + "\n\n"
 
     async def gen():
-        yield _sse({"type": "init", "events": store.all(), "stats": _full_stats()})
+        yield _sse({"type": "init", "events": _events(endpoint), "stats": _full_stats(endpoint)})
         async for ev in bus.subscribe():
             if ev is None:
                 yield ": keepalive\n\n"
-            else:
-                yield _sse({"type": "update", "events": [ev], "stats": _full_stats()})
+                continue
+            if endpoint and ev.get("endpoint") != endpoint:
+                continue
+            yield _sse({"type": "update", "events": [ev], "stats": _full_stats(endpoint)})
 
     return StreamingResponse(
         gen(),

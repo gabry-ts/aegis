@@ -7,10 +7,13 @@ when the store actually holds evidence that the corresponding control fired.
 from .. import schemas
 
 
-def compute(store):
-    """Return AI Act coverage over the three tracked articles."""
-    events = store.all()
+def compute(events):
+    """Return AI Act coverage over the three tracked articles for `events`.
 
+    `events` is a list of audit events (the whole store, or a per-endpoint
+    slice). Coverage is evidence-based: an article counts as covered only when
+    the slice actually holds a record of its control firing.
+    """
     robustness = 0
     record_keeping = len(events)
     transparency = 0

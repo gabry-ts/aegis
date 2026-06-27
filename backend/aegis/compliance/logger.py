@@ -102,6 +102,11 @@ def _aggregate_stats(events):
     }
 
 
+def aggregate_stats(events):
+    """Public reducer over an arbitrary event slice (e.g. a per-endpoint view)."""
+    return _aggregate_stats(events)
+
+
 def _verify_chain(events):
     """Recompute the hash chain over `events` (ascending by id).
 
