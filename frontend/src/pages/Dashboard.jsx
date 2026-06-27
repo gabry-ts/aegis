@@ -44,8 +44,9 @@ export default function Dashboard() {
       <div className="page__head">
         <h1 className="page-title">Operations</h1>
         <p className="page-sub">
-          Live guardrail activity and the EU AI Act audit trail. One event does two jobs: a
-          security signal on the left, compliance evidence on the right.
+          Every request is inspected, hostile ones are blocked, and each one is sealed into a
+          tamper-evident audit trail. One event does two jobs: a live security signal on the
+          left, EU AI Act evidence on the right.
         </p>
       </div>
 

@@ -1091,6 +1091,18 @@ input[type='text']:focus-visible {
   font-weight: 700;
   color: var(--ink);
 }
+.coverage__meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.coverage__sub {
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
 .articles {
   list-style: none;
   margin: 0;

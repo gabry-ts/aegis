@@ -81,7 +81,6 @@ export default function App() {
   }, [])
 
   const isRegolo = meta?.provider?.regolo
-  const percent = meta?.score?.percent ?? 0
   const badge = offline ? 'offline' : isRegolo ? 'regolo' : 'mock'
 
   return (
@@ -111,8 +110,8 @@ export default function App() {
             <span className="live-dot" />
             {offline ? 'OFFLINE' : isRegolo ? 'REGOLO' : 'MOCK'}
           </span>
-          <span className="score-pill" title="EU AI Act coverage">
-            AI ACT <b>{percent}%</b>
+          <span className="score-pill" title="EU AI Act articles covered, each backed by logged evidence">
+            AI ACT <b>{meta?.score?.score ?? '0/3'}</b>
           </span>
         </div>
       </header>
