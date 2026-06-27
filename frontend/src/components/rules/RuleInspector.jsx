@@ -28,6 +28,11 @@ export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
       </header>
 
       <div className="inspector__body">
+        <p className="insp-note insp-note--shared">
+          This rule lives in the shared library. Editing or deleting it affects every
+          endpoint that arms it; use the board toggle to arm or disarm it for this endpoint only.
+        </p>
+
         <Field label="Name">
           <input
             type="text"
@@ -160,8 +165,13 @@ export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
       </div>
 
       <footer className="inspector__foot">
-        <button type="button" className="btn btn--ghost insp-delete" onClick={() => onDelete(rule.id)}>
-          Delete rule
+        <button
+          type="button"
+          className="btn btn--ghost insp-delete"
+          onClick={() => onDelete(rule.id)}
+          title="Remove this rule from the shared library (affects all endpoints)"
+        >
+          Delete from library
         </button>
       </footer>
     </aside>

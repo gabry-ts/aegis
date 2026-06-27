@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { getDetections, saveDetectionsRaw, testDetection, toggleJudge } from '../api.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  getDetections,
+  saveDetectionsRaw,
+  testDetection,
+  updateEndpoint,
+  createEndpoint,
+  deleteEndpoint,
+} from '../api.js'
+import { useEndpoints } from '../context/EndpointsContext.jsx'
+import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
 import RuleCanvas from '../components/rules/RuleCanvas.jsx'
 import RuleList from '../components/rules/RuleList.jsx'
 import RuleInspector from '../components/rules/RuleInspector.jsx'
@@ -20,7 +29,15 @@ function useNarrow() {
 }
 
 export default function Rules() {
-  const [rules, setRules] = useState([])
+  const { endpoints, current, setCurrent, refresh: refreshEndpoints } = useEndpoints()
+
+  // The shared rule library (definitions, editable) and, separately, which of
+  // those rules are armed for the selected endpoint plus its judge flag.
+  const [library, setLibrary] = useState([])
+  const [armed, setArmed] = useState(() => new Set())
+  const [judge, setJudge] = useState(false)
+  const [judgeAvailable, setJudgeAvailable] = useState(false)
+
   const [selectedId, setSelectedId] = useState(null)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -29,90 +46,193 @@ export default function Rules() {
   const [testRes, setTestRes] = useState(null)
   const [testing, setTesting] = useState(false)
   const [hitIds, setHitIds] = useState(() => new Set())
-  const [judge, setJudge] = useState({ enabled: false, available: false })
   const [resetKey, setResetKey] = useState(0)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [confirmDel, setConfirmDel] = useState(false)
   const narrow = useNarrow()
+  const loadedSlugRef = useRef(null)
 
-  const load = useCallback(async () => {
+  const currentEp = useMemo(
+    () => endpoints.find((e) => e.slug === current) || null,
+    [endpoints, current],
+  )
+
+  const loadLibrary = useCallback(async () => {
     try {
       const d = await getDetections()
-      setRules(d.rules || [])
-      setJudge(d.judge || { enabled: false, available: false })
-      setDirty(false)
+      setLibrary(d.rules || [])
+      setJudgeAvailable(!!d.judge?.available)
     } catch {
       /* keep last */
     }
   }, [])
 
-  const onToggleJudge = useCallback(async () => {
-    try {
-      const r = await toggleJudge()
-      setJudge({ enabled: r.enabled, available: r.available })
-      toast(`LLM judge ${r.enabled ? 'resumed' : 'paused'}`, r.enabled ? 'success' : 'info')
-    } catch {
-      toast('Could not toggle the judge', 'error')
-    }
-  }, [])
+  useEffect(() => {
+    loadLibrary()
+  }, [loadLibrary])
+
+  // Pull armed rules + judge from the endpoint whenever the selection changes.
+  useEffect(() => {
+    if (!currentEp || loadedSlugRef.current === currentEp.slug) return
+    loadedSlugRef.current = currentEp.slug
+    setArmed(new Set(currentEp.rules || []))
+    setJudge(!!currentEp.judge)
+    setDirty(false)
+    setSaveState(null)
+    setSelectedId(null)
+  }, [currentEp])
 
   useEffect(() => {
-    load()
-  }, [load])
+    setConfirmDel(false)
+  }, [current])
 
   const selectedRule = useMemo(
-    () => rules.find((r) => r.id === selectedId) || null,
-    [rules, selectedId],
+    () => library.find((r) => r.id === selectedId) || null,
+    [library, selectedId],
+  )
+
+  // What the board renders: library definitions with `enabled` standing in for
+  // "armed for this endpoint", so the canvas dims and wires them accordingly.
+  const boardRules = useMemo(
+    () => library.map((r) => ({ ...r, enabled: armed.has(r.id) })),
+    [library, armed],
   )
 
   const onToggle = useCallback((id) => {
-    setRules((rs) => rs.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
+    setArmed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setDirty(true)
+  }, [])
+
+  const onToggleJudge = useCallback(() => {
+    setJudge((j) => !j)
     setDirty(true)
   }, [])
 
   const onChangeRule = useCallback((id, p) => {
-    setRules((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)))
+    setLibrary((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)))
     setDirty(true)
   }, [])
 
   const onAdd = useCallback(() => {
-    setRules((rs) => {
+    setLibrary((rs) => {
       const r = blankRule(rs.map((x) => x.id))
       setSelectedId(r.id)
+      setArmed((prev) => new Set(prev).add(r.id))
       return [...rs, r]
     })
     setDirty(true)
   }, [])
 
   const onDelete = useCallback((id) => {
-    setRules((rs) => rs.filter((r) => r.id !== id))
+    setLibrary((rs) => rs.filter((r) => r.id !== id))
+    setArmed((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
     setSelectedId((cur) => (cur === id ? null : cur))
     setDirty(true)
   }, [])
 
   const onSave = async () => {
+    if (!current) return
     setBusy(true)
     setSaveState(null)
     try {
-      const r = await saveDetectionsRaw(rulesToYaml(rules))
-      if (r.ok) {
-        await load()
-        setSaveState({ ok: true })
-        toast('Rule pack saved & reloaded', 'success')
-      } else {
+      // Save the shared library first so any brand-new rule ids exist before we
+      // pin them as this endpoint's armed set.
+      const r = await saveDetectionsRaw(rulesToYaml(library))
+      if (!r.ok) {
         setSaveState({ ok: false, error: r.error })
         toast(r.error || 'Invalid rule pack', 'error')
+        return
       }
+      const u = await updateEndpoint(current, { rules: [...armed], judge })
+      if (!u.ok) {
+        setSaveState({ ok: false, error: u.error })
+        toast(u.error || 'Could not save endpoint', 'error')
+        return
+      }
+      await loadLibrary()
+      await refreshEndpoints()
+      setDirty(false)
+      setSaveState({ ok: true })
+      toast('Endpoint saved & reloaded', 'success')
     } catch {
       setSaveState({ ok: false, error: 'request failed' })
       toast('Request failed', 'error')
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
+  }
+
+  const switchTo = (slug) => {
+    if (!slug || slug === current) return
+    if (dirty) toast('Unsaved changes discarded', 'info')
+    loadedSlugRef.current = null
+    setCurrent(slug)
+  }
+
+  const onCreate = async () => {
+    const name = newName.trim()
+    if (!name || busy) return
+    setBusy(true)
+    try {
+      const r = await createEndpoint({ name })
+      if (r.ok) {
+        await refreshEndpoints()
+        loadedSlugRef.current = null
+        setCurrent(r.endpoint.slug)
+        setCreating(false)
+        setNewName('')
+        toast(`Endpoint “${r.endpoint.name}” created`, 'success')
+      } else {
+        toast(r.error || 'Could not create endpoint', 'error')
+      }
+    } catch {
+      toast('Request failed', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onDeleteEndpoint = async () => {
+    if (!current || endpoints.length <= 1) return
+    if (!confirmDel) {
+      setConfirmDel(true)
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await deleteEndpoint(current)
+      if (r.ok) {
+        const remaining = endpoints.filter((e) => e.slug !== current)
+        await refreshEndpoints()
+        loadedSlugRef.current = null
+        setCurrent(remaining[0]?.slug || null)
+        toast('Endpoint deleted', 'info')
+      } else {
+        toast(r.error || 'Could not delete', 'error')
+      }
+    } catch {
+      toast('Request failed', 'error')
+    } finally {
+      setConfirmDel(false)
+      setBusy(false)
+    }
   }
 
   const onTest = async () => {
     if (!testText.trim() || testing) return
     setTesting(true)
     try {
-      const r = await testDetection(testText)
+      const r = await testDetection(testText, 'input', current)
       setHitIds(new Set((r.hits || []).map((h) => h.id)))
       setTestRes(r.detection)
     } catch {
@@ -133,10 +253,76 @@ export default function Rules() {
       <div className="page__head">
         <h1 className="page-title">Detection Rules</h1>
         <p className="page-sub">
-          The guardrail as a board. Each block is a detector wired to the stage where it runs:
-          drag to arrange (the layout is saved automatically), toggle to arm, click to edit.
-          Every change is validated before it touches the live engine.
+          The guardrail as a board, one flow per endpoint. Arm rules from the shared library or add
+          new ones; the toggles and the judge apply to the selected endpoint only. Editing a rule's
+          definition changes it for every endpoint that arms it.
         </p>
+      </div>
+
+      <div className="rules-epbar">
+        <EndpointSwitcher
+          endpoints={endpoints}
+          value={current}
+          onChange={switchTo}
+          label="Endpoint"
+        />
+        {currentEp && (
+          <span className="rules-epbar__meta c-faint small mono">
+            {armed.size} rule{armed.size === 1 ? '' : 's'} armed{judge ? ' · judge on' : ''}
+          </span>
+        )}
+        <div className="rules-epbar__spacer" />
+        {creating ? (
+          <span className="rules-epnew">
+            <input
+              type="text"
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onCreate()
+                if (e.key === 'Escape') {
+                  setCreating(false)
+                  setNewName('')
+                }
+              }}
+              placeholder="New endpoint name…"
+            />
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onCreate}
+              disabled={busy || !newName.trim()}
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                setCreating(false)
+                setNewName('')
+              }}
+            >
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" className="btn btn--ghost" onClick={() => setCreating(true)}>
+            + New endpoint
+          </button>
+        )}
+        <button
+          type="button"
+          className={'btn btn--ghost rules-epdel' + (confirmDel ? ' is-confirm' : '')}
+          onClick={onDeleteEndpoint}
+          disabled={busy || endpoints.length <= 1}
+          title={
+            endpoints.length <= 1 ? 'At least one endpoint is required' : 'Delete this endpoint'
+          }
+        >
+          {confirmDel ? 'Confirm delete' : 'Delete'}
+        </button>
       </div>
 
       <div className="rules-toolbar">
@@ -146,7 +332,7 @@ export default function Rules() {
             value={testText}
             onChange={(e) => setTestText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onTest()}
-            placeholder="Test a prompt against the board…"
+            placeholder="Test a prompt against this endpoint…"
           />
           <button
             type="button"
@@ -209,7 +395,7 @@ export default function Rules() {
             onClick={onSave}
             disabled={busy || !dirty}
           >
-            {busy ? 'Validating…' : 'Save changes'}
+            {busy ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </div>
@@ -217,7 +403,7 @@ export default function Rules() {
       <div className="rules-workspace">
         {narrow ? (
           <RuleList
-            rules={rules}
+            rules={boardRules}
             hitIds={hitIds}
             selectedId={selectedId}
             onToggle={onToggle}
@@ -225,10 +411,10 @@ export default function Rules() {
           />
         ) : (
           <RuleCanvas
-            rules={rules}
+            rules={boardRules}
             hitIds={hitIds}
             selectedId={selectedId}
-            judge={judge}
+            judge={{ enabled: judge, available: judgeAvailable }}
             resetKey={resetKey}
             onSelect={setSelectedId}
             onToggle={onToggle}

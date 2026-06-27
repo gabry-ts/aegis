@@ -4206,3 +4206,52 @@ input[type='text']:focus-visible {
   border-color: var(--iris-line);
   box-shadow: var(--glow-iris);
 }
+
+/* ---- guardrail board: endpoint bar ------------------------------------- */
+.rules-epbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.rules-epbar__meta {
+  white-space: nowrap;
+}
+.rules-epbar__spacer {
+  flex: 1 1 auto;
+}
+.rules-epnew {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rules-epnew input {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  min-width: 200px;
+}
+.rules-epnew input:focus-visible {
+  outline: none;
+  border-color: var(--iris-line);
+  box-shadow: var(--glow-iris);
+}
+.rules-epdel.is-confirm {
+  color: var(--red);
+  border-color: var(--red-line);
+  background: var(--red-fill);
+}
+
+/* Inspector: shared-library notice */
+.insp-note--shared {
+  border-left: 2px solid var(--iris-line);
+  padding-left: 10px;
+  color: var(--muted);
+}
