@@ -56,8 +56,9 @@ npm run dev                   # http://localhost:5173 (proxies /api to :8000)
 ## What you get
 
 - **Endpoints** — multiple named guardrail flows, each reached at its own
-  `/v1/{slug}/...`. Every flow arms its own subset of the shared rule library and
-  its own judge setting, and the dashboard, audit and coverage views filter per
+  `/v1/{slug}/...`. Every flow arms its own subset of the shared rule library, its
+  own judge setting and its own upstream provider (base URL + model + an
+  env-referenced key), and the dashboard, audit and coverage views filter per
   endpoint over a single tamper-evident chain.
 - **Guardrail board** — the rules of the selected endpoint as a drag-arrange
   board: toggle to arm a rule for that flow, click to edit the shared definition.
@@ -96,9 +97,15 @@ cd backend && source .venv/bin/activate && pytest -q
 ## API
 
 Each endpoint is a named guardrail **flow** that selects which rules from the
-shared library are armed and whether the LLM judge runs. The proxy is reached
+shared library are armed, whether the LLM judge runs, and **where passing
+requests are forwarded** (its own `base_url` + `model`). The proxy is reached
 per-flow at `/v1/{slug}/chat/completions`, and the read endpoints accept an
 optional `?endpoint=<slug>` filter (omit it for the aggregate, all-endpoints view).
+
+An endpoint's upstream credential is referenced by the **name** of an environment
+variable (`api_key_env`, e.g. `OPENAI_API_KEY`), never stored as a raw secret —
+the value lives only in `.env`. With no upstream configured, an endpoint falls
+back to the global provider (Regolo, or the offline mock).
 
 ```bash
 curl http://localhost:8000/v1/default/chat/completions \
