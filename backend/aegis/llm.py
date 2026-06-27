@@ -82,29 +82,40 @@ def _mock_complete(messages: List[Dict[str, str]]) -> str:
     return "Happy to help! Tell me a bit more about what you need and I'll assist."
 
 
+def _openai_call(messages, model, base_url, api_key, label):
+    """Call an OpenAI-compatible endpoint, logging the real cause on failure."""
+    try:
+        import openai
+
+        client = openai.OpenAI(base_url=base_url, api_key=api_key)
+        resp = client.chat.completions.create(model=model, messages=messages)
+        return resp.choices[0].message.content
+    except Exception as exc:
+        # Surface the cause in the server log (wrong key/model/network) while
+        # keeping the API response clean and non-fatal.
+        print(f"[aegis] {label} call failed: {exc}", file=sys.stderr)
+        return _SAFE_FALLBACK
+
+
 def complete(
     messages: List[Dict[str, str]],
     model: Optional[str] = None,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
     stream: bool = False,
 ) -> str:
-    """Return an assistant completion for the given chat messages."""
-    if config.use_regolo():
-        try:
-            import openai
+    """Return an assistant completion for the given chat messages.
 
-            client = openai.OpenAI(
-                base_url=config.REGOLO_BASE_URL,
-                api_key=config.REGOLO_API_KEY,
-            )
-            resp = client.chat.completions.create(
-                model=model or config.REGOLO_MODEL,
-                messages=messages,
-            )
-            return resp.choices[0].message.content
-        except Exception as exc:
-            # Surface the real cause in the server log (wrong key/model/network)
-            # while keeping the API response clean and non-fatal.
-            print(f"[aegis] Regolo call failed: {exc}", file=sys.stderr)
-            return _SAFE_FALLBACK
+    When `base_url` and `api_key` are supplied (an endpoint's own upstream), the
+    request is forwarded there. Otherwise it falls back to the global Regolo
+    provider, and finally to the deterministic offline mock.
+    """
+    if base_url and api_key:
+        return _openai_call(messages, model or config.REGOLO_MODEL, base_url, api_key, "upstream")
+
+    if config.use_regolo():
+        return _openai_call(
+            messages, model or config.REGOLO_MODEL, config.REGOLO_BASE_URL, config.REGOLO_API_KEY, "Regolo"
+        )
 
     return _mock_complete(messages)

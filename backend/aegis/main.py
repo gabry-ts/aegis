@@ -70,6 +70,23 @@ def _events(endpoint: str = None) -> list:
     return events
 
 
+def _upstream_args(ep: dict) -> dict:
+    """Resolve an endpoint's upstream into llm.complete kwargs.
+
+    The credential is read from the environment by the name the endpoint stores
+    (api_key_env); the secret never lives in the registry. With nothing
+    configured the kwargs are empty and llm.complete falls back to the global
+    provider / mock.
+    """
+    up = ep.get("upstream") or {}
+    env = up.get("api_key_env")
+    return {
+        "model": up.get("model"),
+        "base_url": up.get("base_url"),
+        "api_key": os.getenv(env) if env else None,
+    }
+
+
 def _inspect(text: str, direction: str, active_ids=None, judge_enabled=None) -> dict:
     """Inspect with the configured failure policy (fail-closed vs fail-open).
 
@@ -161,7 +178,13 @@ def chat_completions(slug: str, req: schemas.ChatRequest):
             headers={"X-AEGIS-Verdict": det["verdict"], transparency.HEADER: "false"},
         )
 
-    raw = llm.complete([m.model_dump() for m in req.messages], req.model)
+    ua = _upstream_args(ep)
+    raw = llm.complete(
+        [m.model_dump() for m in req.messages],
+        model=ua["model"] or req.model,
+        base_url=ua["base_url"],
+        api_key=ua["api_key"],
+    )
     out = _inspect(raw, "output", active, judge_on)
     content = raw
     if out["action"] == "SANITIZED":
@@ -190,7 +213,12 @@ def api_chat(req: schemas.PlaygroundRequest):
     events = []
 
     if not req.guard:
-        raw = llm.complete(llm.demo_messages(req.text))
+        ep0 = endpoints.get(req.slug) if req.slug else None
+        ua0 = _upstream_args(ep0) if ep0 else {"model": None, "base_url": None, "api_key": None}
+        raw = llm.complete(
+            llm.demo_messages(req.text),
+            model=ua0["model"], base_url=ua0["base_url"], api_key=ua0["api_key"],
+        )
         return {
             "guard": False, "blocked": False, "input_detection": None, "reply": raw,
             "output_detection": None, "sanitized": False, "transparency": False, "events": [],
@@ -212,7 +240,13 @@ def api_chat(req: schemas.PlaygroundRequest):
             "output_detection": None, "sanitized": False, "transparency": False, "events": events,
         }
 
-    raw = llm.complete(llm.demo_messages(req.text))
+    ua = _upstream_args(ep)
+    raw = llm.complete(
+        llm.demo_messages(req.text),
+        model=ua["model"],
+        base_url=ua["base_url"],
+        api_key=ua["api_key"],
+    )
     out = _inspect(raw, "output", active, judge_on)
     reply = raw
     sanitized = False
