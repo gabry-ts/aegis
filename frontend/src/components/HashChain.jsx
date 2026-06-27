@@ -6,13 +6,16 @@ const FILTERS = ['all', 'BLOCKED', 'SANITIZED', 'ALLOWED', 'LOGGED']
 const SEAL_LABEL = { tampered: 'tampered', invalid: 'invalidated', verified: 'verified', sealed: 'sealed' }
 const PAGE = 10
 
-export default function HashChain({ events, phase, brokenAt }) {
+export default function HashChain({ events, phase, brokenAt, endpoint = null }) {
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(0)
   const brokenRef = useRef(null)
 
+  // Scope the listed records to an endpoint when asked; the chain itself stays
+  // global, so integrity is always verified across every record.
+  const scoped = endpoint ? events.filter((e) => e.endpoint === endpoint) : events
   // newest record first — the convention for a log you actually read
-  const ordered = [...events].sort((a, b) => b.id - a.id)
+  const ordered = [...scoped].sort((a, b) => b.id - a.id)
   const rows = filter === 'all' ? ordered : ordered.filter((e) => e.action === filter)
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE))
@@ -35,11 +38,17 @@ export default function HashChain({ events, phase, brokenAt }) {
     setPage(0)
   }
 
+  // reset to the first page when the endpoint scope changes
+  useEffect(() => {
+    setPage(0)
+  }, [endpoint])
+
   // when the chain breaks, jump to the page holding the tampered record and centre it
   useEffect(() => {
     if (brokenAt == null) return
     setFilter('all')
-    const idx = [...events].sort((a, b) => b.id - a.id).findIndex((e) => e.id === brokenAt)
+    const list = endpoint ? events.filter((e) => e.endpoint === endpoint) : events
+    const idx = [...list].sort((a, b) => b.id - a.id).findIndex((e) => e.id === brokenAt)
     if (idx >= 0) setPage(Math.floor(idx / PAGE))
     const t = setTimeout(() => {
       brokenRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' })

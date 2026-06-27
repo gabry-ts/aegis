@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getAttacks } from '../api.js'
 import AttackConsole from '../components/AttackConsole.jsx'
+import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
+import { useEndpoints } from '../context/EndpointsContext.jsx'
 
 export default function Playground() {
+  const { endpoints, current, setCurrent } = useEndpoints()
   const [attacks, setAttacks] = useState([])
 
   useEffect(() => {
@@ -16,12 +19,22 @@ export default function Playground() {
       <div className="page__head">
         <h1 className="page-title">Attack Playground</h1>
         <p className="page-sub">
-          Probe the guardrail live. Turn protection off to watch the unprotected model leak its
-          secret, then on to see AEGIS block the attack and write the evidence to the audit trail.
+          Probe a guardrail endpoint live. Pick the flow to attack, then turn protection off to
+          watch the unprotected model leak its secret, and on to see that endpoint block the attack
+          and write the evidence to the audit trail.
         </p>
       </div>
 
-      <AttackConsole attacks={attacks} />
+      <div className="rules-epbar">
+        <EndpointSwitcher
+          endpoints={endpoints}
+          value={current}
+          onChange={(s) => s && setCurrent(s)}
+          label="Attacking"
+        />
+      </div>
+
+      <AttackConsole attacks={attacks} slug={current} />
     </div>
   )
 }

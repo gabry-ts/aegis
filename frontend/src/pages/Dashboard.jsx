@@ -5,14 +5,22 @@ import ThreatFeed from '../components/ThreatFeed.jsx'
 import ComplianceLedger from '../components/ComplianceLedger.jsx'
 import SeverityChart from '../components/SeverityChart.jsx'
 import ComplianceCoverage from '../components/ComplianceCoverage.jsx'
+import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
+import { useEndpoints } from '../context/EndpointsContext.jsx'
+import { streamUrl } from '../api.js'
 
 export default function Dashboard() {
+  const { endpoints } = useEndpoints()
+  const [filter, setFilter] = useState(null) // null = all endpoints
   const [stats, setStats] = useState(null)
   const [events, setEvents] = useState(null)
 
   useEffect(() => {
-    // Real-time push over a single SSE connection (EventSource auto-reconnects).
-    const es = new EventSource('/api/stream')
+    // Real-time push over a single SSE connection, scoped to the selected
+    // endpoint (or all of them). Reconnects whenever the filter changes.
+    setEvents(null)
+    setStats(null)
+    const es = new EventSource(streamUrl(filter))
     es.onmessage = (e) => {
       let msg
       try {
@@ -33,7 +41,7 @@ export default function Dashboard() {
       }
     }
     return () => es.close()
-  }, [])
+  }, [filter])
 
   const loading = events === null
   const ev = events ?? []
@@ -48,6 +56,16 @@ export default function Dashboard() {
           tamper-evident audit trail. One event does two jobs: a live security signal on the
           left, EU AI Act evidence on the right.
         </p>
+      </div>
+
+      <div className="rules-epbar">
+        <EndpointSwitcher
+          endpoints={endpoints}
+          value={filter}
+          onChange={setFilter}
+          allowAll
+          label="View"
+        />
       </div>
 
       <StatusBar stats={stats} />

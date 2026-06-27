@@ -12,7 +12,7 @@ const KIND_COLOR = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-export default function AttackConsole({ attacks }) {
+export default function AttackConsole({ attacks, slug }) {
   const [text, setText] = useState('')
   const [guard, setGuard] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -24,6 +24,9 @@ export default function AttackConsole({ attacks }) {
   const playingRef = useRef(false)
   const attacksRef = useRef([])
   attacksRef.current = attacks
+  // Read the live slug inside async loops so a mid-play endpoint switch lands.
+  const slugRef = useRef(slug)
+  slugRef.current = slug
 
   useEffect(
     () => () => {
@@ -39,7 +42,7 @@ export default function AttackConsole({ attacks }) {
     setRes(null)
     let r
     try {
-      r = await chat(txt, g)
+      r = await chat(txt, g, slugRef.current)
     } catch {
       r = { error: true }
     }

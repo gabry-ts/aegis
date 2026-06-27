@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { demoReset, demoTamper, getAudit, verify as apiVerify } from '../api.js'
 import HashChain from '../components/HashChain.jsx'
+import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
+import { useEndpoints } from '../context/EndpointsContext.jsx'
 import { toast } from '../toast.js'
 
 export default function Integrity() {
+  const { endpoints } = useEndpoints()
+  const [epFilter, setEpFilter] = useState(null) // null = all endpoints
   const [events, setEvents] = useState([])
   const [phase, setPhase] = useState('idle')
   const [brokenAt, setBrokenAt] = useState(null)
@@ -135,7 +139,20 @@ export default function Integrity() {
         </span>
       </div>
 
-      <HashChain events={events} phase={phase} brokenAt={brokenAt} />
+      <div className="rules-epbar">
+        <EndpointSwitcher
+          endpoints={endpoints}
+          value={epFilter}
+          onChange={setEpFilter}
+          allowAll
+          label="Records"
+        />
+        <span className="rules-epbar__meta c-faint small mono">
+          integrity is verified across the entire chain
+        </span>
+      </div>
+
+      <HashChain events={events} phase={phase} brokenAt={brokenAt} endpoint={epFilter} />
     </div>
   )
 }
