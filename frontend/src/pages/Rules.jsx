@@ -28,6 +28,20 @@ function useNarrow() {
   return narrow
 }
 
+// A short, readable target label for an endpoint's upstream.
+function upstreamLabel(up) {
+  if (!up || !up.base_url) return '→ default backend'
+  let host = up.base_url
+  try {
+    host = new URL(up.base_url).host || up.base_url
+  } catch {
+    /* keep raw */
+  }
+  const model = up.model ? ` · ${up.model}` : ''
+  const key = up.key_present ? ' · key ✓' : ' · key ✗'
+  return `→ ${host}${model}${key}`
+}
+
 export default function Rules() {
   const { endpoints, current, setCurrent, refresh: refreshEndpoints } = useEndpoints()
 
@@ -50,6 +64,8 @@ export default function Rules() {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
+  const [showUpstream, setShowUpstream] = useState(false)
+  const [upstreamDraft, setUpstreamDraft] = useState({ base_url: '', model: '', api_key_env: '' })
   const narrow = useNarrow()
   const loadedSlugRef = useRef(null)
 
@@ -78,6 +94,12 @@ export default function Rules() {
     loadedSlugRef.current = currentEp.slug
     setArmed(new Set(currentEp.rules || []))
     setJudge(!!currentEp.judge)
+    const up = currentEp.upstream || {}
+    setUpstreamDraft({
+      base_url: up.base_url || '',
+      model: up.model || '',
+      api_key_env: up.api_key_env || '',
+    })
     setDirty(false)
     setSaveState(null)
     setSelectedId(null)
@@ -85,6 +107,7 @@ export default function Rules() {
 
   useEffect(() => {
     setConfirmDel(false)
+    setShowUpstream(false)
   }, [current])
 
   const selectedRule = useMemo(
@@ -228,6 +251,31 @@ export default function Rules() {
     }
   }
 
+  const saveUpstream = async () => {
+    if (!current || busy) return
+    setBusy(true)
+    try {
+      const u = await updateEndpoint(current, {
+        upstream: {
+          base_url: upstreamDraft.base_url.trim() || null,
+          model: upstreamDraft.model.trim() || null,
+          api_key_env: upstreamDraft.api_key_env.trim() || null,
+        },
+      })
+      if (u.ok) {
+        await refreshEndpoints()
+        setShowUpstream(false)
+        toast('Upstream saved', 'success')
+      } else {
+        toast(u.error || 'Could not save upstream', 'error')
+      }
+    } catch {
+      toast('Request failed', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onTest = async () => {
     if (!testText.trim() || testing) return
     setTesting(true)
@@ -270,6 +318,16 @@ export default function Rules() {
           <span className="rules-epbar__meta c-faint small mono">
             {armed.size} rule{armed.size === 1 ? '' : 's'} armed{judge ? ' · judge on' : ''}
           </span>
+        )}
+        {currentEp && (
+          <button
+            type="button"
+            className={'rules-epbar__target mono small' + (showUpstream ? ' is-open' : '')}
+            onClick={() => setShowUpstream((s) => !s)}
+            title="Configure where this endpoint forwards passing requests"
+          >
+            {upstreamLabel(currentEp.upstream)}
+          </button>
         )}
         <div className="rules-epbar__spacer" />
         {creating ? (
@@ -324,6 +382,68 @@ export default function Rules() {
           {confirmDel ? 'Confirm delete' : 'Delete'}
         </button>
       </div>
+
+      {showUpstream && currentEp && (
+        <div className="rules-uppanel">
+          <div className="rules-uppanel__head">
+            <span className="rules-uppanel__title mono">UPSTREAM · where passing requests go</span>
+            <span className="c-faint small">
+              Leave empty to use the global backend. The API key is read from the named environment
+              variable — the secret never leaves your .env.
+            </span>
+          </div>
+          <div className="rules-uppanel__grid">
+            <label className="uppanel-field">
+              <span className="uppanel-field__label">Base URL</span>
+              <input
+                type="text"
+                className="mono"
+                placeholder="https://api.openai.com/v1"
+                value={upstreamDraft.base_url}
+                onChange={(e) => setUpstreamDraft((u) => ({ ...u, base_url: e.target.value }))}
+              />
+            </label>
+            <label className="uppanel-field">
+              <span className="uppanel-field__label">Model</span>
+              <input
+                type="text"
+                className="mono"
+                placeholder="gpt-4o"
+                value={upstreamDraft.model}
+                onChange={(e) => setUpstreamDraft((u) => ({ ...u, model: e.target.value }))}
+              />
+            </label>
+            <label className="uppanel-field">
+              <span className="uppanel-field__label">API key · env var</span>
+              <input
+                type="text"
+                className="mono"
+                placeholder="OPENAI_API_KEY"
+                value={upstreamDraft.api_key_env}
+                onChange={(e) => setUpstreamDraft((u) => ({ ...u, api_key_env: e.target.value }))}
+              />
+            </label>
+          </div>
+          <div className="rules-uppanel__foot">
+            <span className="uppanel-status small mono">
+              {!upstreamDraft.api_key_env.trim()
+                ? 'no key — uses the global backend'
+                : currentEp.upstream?.api_key_env === upstreamDraft.api_key_env.trim() &&
+                    currentEp.upstream?.key_present
+                  ? '✓ env var is set'
+                  : `set ${upstreamDraft.api_key_env.trim()} in backend/.env`}
+            </span>
+            <div className="rules-uppanel__actions">
+              <button type="button" className="btn btn--ghost" onClick={() => setShowUpstream(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn--primary" onClick={saveUpstream} disabled={busy}>
+                Save upstream
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rules-toolbar">
         <div className="rules-test">
