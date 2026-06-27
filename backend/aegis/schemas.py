@@ -179,12 +179,22 @@ class InspectRequest(BaseModel):
     endpoint: Optional[str] = None
 
 
+class Upstream(BaseModel):
+    """Where an endpoint forwards passing requests. Only the env-var *name* of
+    the credential is carried (api_key_env); the secret never leaves .env."""
+
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    api_key_env: Optional[str] = None
+
+
 class EndpointCreate(BaseModel):
     name: str
     slug: Optional[str] = None
     description: str = ""
     rules: List[str] = []
     judge: bool = False
+    upstream: Optional[Upstream] = None
 
 
 class EndpointUpdate(BaseModel):
@@ -192,6 +202,7 @@ class EndpointUpdate(BaseModel):
     description: Optional[str] = None
     rules: Optional[List[str]] = None
     judge: Optional[bool] = None
+    upstream: Optional[Upstream] = None
 
 
 class AssessRequest(BaseModel):

@@ -67,6 +67,22 @@ def _defaults():
     ]
 
 
+def _norm_upstream(raw):
+    """Normalize an upstream block to {base_url, model, api_key_env}.
+
+    Only the env-var *name* is ever stored, never a raw secret. Non-string or
+    empty fields are dropped; a missing/invalid block becomes {}.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for key in ("base_url", "model", "api_key_env"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            out[key] = value.strip()
+    return out
+
+
 def _validate(data):
     """Validate a parsed registry; return (endpoints, error). None on error."""
     if not isinstance(data, dict) or not isinstance(data.get("endpoints"), list):
@@ -95,6 +111,7 @@ def _validate(data):
                 "description": str(raw.get("description") or ""),
                 "rules": list(rules),
                 "judge": bool(raw.get("judge", False)),
+                "upstream": _norm_upstream(raw.get("upstream")),
             }
         )
     return out, None
@@ -128,6 +145,8 @@ def load():
 
 
 def _public(ep):
+    up = ep.get("upstream") or {}
+    env = up.get("api_key_env")
     return {
         "slug": ep["slug"],
         "name": ep["name"],
@@ -135,6 +154,14 @@ def _public(ep):
         "rules": list(ep.get("rules", [])),
         "rule_count": len(ep.get("rules", [])),
         "judge": bool(ep.get("judge", False)),
+        "upstream": {
+            "base_url": up.get("base_url"),
+            "model": up.get("model"),
+            "api_key_env": env,
+            # Whether the referenced env var actually resolves to a value right
+            # now — surfaced to the UI, never the secret itself.
+            "key_present": bool(env and os.getenv(env)),
+        },
     }
 
 
@@ -156,7 +183,7 @@ def active_ids(slug):
     return set(ep["rules"]) if ep else None
 
 
-def create(name, slug=None, description="", rules=None, judge=False):
+def create(name, slug=None, description="", rules=None, judge=False, upstream=None):
     slug = (slug or _slugify(name)).strip().lower()
     if not _SLUG_RE.match(slug):
         return {"ok": False, "error": "invalid slug (a-z, 0-9, hyphen; 1..40 chars)"}
@@ -170,13 +197,14 @@ def create(name, slug=None, description="", rules=None, judge=False):
             "description": str(description or ""),
             "rules": [r for r in (rules or []) if r in known],
             "judge": bool(judge),
+            "upstream": _norm_upstream(upstream),
         }
         _registry["endpoints"].append(ep)
         _write(_registry["endpoints"])
     return {"ok": True, "endpoint": _public(ep)}
 
 
-def update(slug, name=None, description=None, rules=None, judge=None):
+def update(slug, name=None, description=None, rules=None, judge=None, upstream=None):
     with _lock:
         for ep in _registry["endpoints"]:
             if ep["slug"] == slug:
@@ -189,6 +217,8 @@ def update(slug, name=None, description=None, rules=None, judge=None):
                     ep["rules"] = [r for r in rules if r in known]
                 if judge is not None:
                     ep["judge"] = bool(judge)
+                if upstream is not None:
+                    ep["upstream"] = _norm_upstream(upstream)
                 _write(_registry["endpoints"])
                 return {"ok": True, "endpoint": _public(ep)}
     return {"ok": False, "error": "endpoint not found"}
