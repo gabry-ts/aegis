@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { chat } from '../api.js'
 import LiveFire from './LiveFire.jsx'
 
@@ -10,22 +10,86 @@ const KIND_COLOR = {
   SAFE: 'green',
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
 export default function AttackConsole({ attacks }) {
   const [text, setText] = useState('')
   const [guard, setGuard] = useState(true)
   const [loading, setLoading] = useState(false)
   const [res, setRes] = useState(null)
+  const [playing, setPlaying] = useState(false)
+
+  const runIdRef = useRef(0)
+  const playingRef = useRef(false)
+  const attacksRef = useRef([])
+  attacksRef.current = attacks
+
+  useEffect(
+    () => () => {
+      playingRef.current = false
+      runIdRef.current += 1
+    },
+    [],
+  )
+
+  // Fire one prompt and surface the real trace, ignoring stale runs.
+  const fire = async (txt, g, myId) => {
+    setLoading(true)
+    setRes(null)
+    let r
+    try {
+      r = await chat(txt, g)
+    } catch {
+      r = { error: true }
+    }
+    if (runIdRef.current !== myId) return null
+    setRes(r)
+    setLoading(false)
+    return r
+  }
+
+  const stopPlay = () => {
+    playingRef.current = false
+    setPlaying(false)
+  }
 
   const send = async () => {
     if (!text.trim() || loading) return
-    setLoading(true)
-    setRes(null)
-    try {
-      setRes(await chat(text, guard))
-    } catch {
-      setRes({ error: true })
-    } finally {
+    stopPlay()
+    const myId = (runIdRef.current += 1)
+    await fire(text, guard, myId)
+  }
+
+  // Hands-free showcase: walk the attack deck, letting each cascade play out.
+  async function autoLoop() {
+    let i = 0
+    while (playingRef.current) {
+      const list = attacksRef.current
+      if (!list.length) {
+        await sleep(400)
+        continue
+      }
+      const a = list[i % list.length]
+      const myId = (runIdRef.current += 1)
+      setText(a.text)
+      setGuard(true)
+      await fire(a.text, true, myId)
+      if (!playingRef.current || runIdRef.current !== myId) break
+      await sleep(4200)
+      i += 1
+    }
+  }
+
+  const togglePlay = () => {
+    if (playingRef.current) {
+      playingRef.current = false
+      setPlaying(false)
+      runIdRef.current += 1
       setLoading(false)
+    } else {
+      playingRef.current = true
+      setPlaying(true)
+      autoLoop()
     }
   }
 
@@ -38,7 +102,10 @@ export default function AttackConsole({ attacks }) {
               key={i}
               type="button"
               className={`quick-chip quick-chip--${KIND_COLOR[a.kind] || 'muted'}`}
-              onClick={() => setText(a.text)}
+              onClick={() => {
+                stopPlay()
+                setText(a.text)
+              }}
             >
               {a.label}
             </button>
@@ -69,14 +136,24 @@ export default function AttackConsole({ attacks }) {
             <span className="toggle__label">AEGIS {guard ? 'ON' : 'OFF'}</span>
           </button>
 
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={send}
-            disabled={loading || !text.trim()}
-          >
-            {loading ? 'Inspecting…' : 'Send prompt'}
-          </button>
+          <div className="console__buttons">
+            <button
+              type="button"
+              className={'btn ' + (playing ? 'btn--blue' : 'btn--ghost')}
+              onClick={togglePlay}
+              title="Cycle the attack deck hands-free"
+            >
+              {playing ? '❚❚ Pause demo' : '▶ Auto-play'}
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={send}
+              disabled={loading || !text.trim()}
+            >
+              {loading ? 'Inspecting…' : 'Send prompt'}
+            </button>
+          </div>
         </div>
 
         {!guard && (
@@ -87,7 +164,7 @@ export default function AttackConsole({ attacks }) {
       </section>
 
       <section className="result">
-        <LiveFire res={res} guard={guard} loading={loading} prompt={text} />
+        <LiveFire res={res} loading={loading} />
       </section>
     </div>
   )

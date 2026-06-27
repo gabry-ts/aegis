@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getStats } from './api.js'
 import Dashboard from './pages/Dashboard.jsx'
-import Flow from './pages/Flow.jsx'
 import Integrity from './pages/Integrity.jsx'
 import Playground from './pages/Playground.jsx'
 import Benchmark from './pages/Benchmark.jsx'
@@ -12,18 +11,11 @@ import Toaster from './components/Toaster.jsx'
 import Assistant from './components/Assistant.jsx'
 
 const SECTIONS = [
+  { label: 'Dashboard', caption: 'live activity', base: '/', paths: ['/'], subs: [] },
+  { label: 'Playground', caption: 'attack it live', base: '/playground', paths: ['/playground'], subs: [] },
   {
-    label: 'Monitor',
-    base: '/',
-    paths: ['/', '/pipeline'],
-    subs: [
-      { to: '/', label: 'Dashboard' },
-      { to: '/pipeline', label: 'Pipeline' },
-    ],
-  },
-  { label: 'Playground', base: '/playground', paths: ['/playground'], subs: [] },
-  {
-    label: 'Detections',
+    label: 'Guardrail',
+    caption: 'rules & coverage',
     base: '/detections',
     paths: ['/detections', '/benchmark'],
     subs: [
@@ -33,6 +25,7 @@ const SECTIONS = [
   },
   {
     label: 'Compliance',
+    caption: 'audit & ai act',
     base: '/integrity',
     paths: ['/integrity', '/assessment'],
     subs: [
@@ -111,7 +104,8 @@ export default function App() {
               to={s.base}
               className={'tab' + (s === section ? ' tab--active' : '')}
             >
-              {s.label}
+              <span className="tab__label">{s.label}</span>
+              <span className="tab__sub">{s.caption}</span>
             </Link>
           ))}
         </nav>
@@ -132,12 +126,12 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/pipeline" element={<Flow />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/detections" element={<Rules />} />
           <Route path="/benchmark" element={<Benchmark />} />
           <Route path="/integrity" element={<Integrity />} />
           <Route path="/assessment" element={<Assessment />} />
+          <Route path="/pipeline" element={<Navigate to="/playground" replace />} />
         </Routes>
       </main>
 

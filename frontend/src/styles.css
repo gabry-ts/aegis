@@ -255,19 +255,38 @@ button {
 }
 .tab {
   position: relative;
-  padding: 8px 12px;
-  font-size: 0.86rem;
-  font-weight: 500;
-  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 12px;
   border-radius: var(--r-sm);
-  transition: color var(--t), background var(--t);
+  transition: background var(--t);
 }
 .tab:hover {
-  color: var(--ink);
   background: var(--surface-2);
 }
-.tab--active {
+.tab__label {
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--muted);
+  transition: color var(--t);
+}
+.tab__sub {
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: var(--faint);
+  transition: color var(--t);
+}
+.tab:hover .tab__label {
   color: var(--ink);
+}
+.tab--active .tab__label {
+  color: var(--ink);
+}
+.tab--active .tab__sub {
+  color: var(--muted);
 }
 .tab--active::after {
   content: '';
@@ -1425,6 +1444,12 @@ input[type='text']:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+.console__buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .console__warn {
   margin: 0;
@@ -3172,6 +3197,9 @@ input[type='text']:focus-visible {
     margin-left: auto;
   }
   .brand-sub {
+    display: none;
+  }
+  .tab__sub {
     display: none;
   }
   .statusbar {
