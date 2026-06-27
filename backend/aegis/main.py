@@ -1,0 +1,408 @@
+"""AEGIS API: OpenAI-compatible guardrail proxy + compliance endpoints.
+
+Integration hub. Pins the interface every other backend module exposes and wires
+the production capabilities (auth, rate limit, streaming, fail-closed inspection,
+tamper-evident audit, push-based SSE, metrics).
+"""
+
+import asyncio
+import json
+import os
+import re
+
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+
+from . import config, schemas, llm, transparency, security, metrics, benchmark, aiact
+from .detection import engine
+from .detection import loader as detloader
+from .detection import judge
+from .compliance import logger as clog
+from .compliance import export as cexport
+from .compliance import score as cscore
+from .compliance import bus as eventbus
+
+app = FastAPI(title="AEGIS", version="0.2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.CORS_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+store = clog.store
+bus = eventbus.bus
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    try:
+        bus.set_loop(asyncio.get_running_loop())
+    except Exception:
+        pass
+    if config.SEED and store.stats().get("total", 0) == 0:
+        try:
+            from demo.seed import seed
+            seed(store)
+        except Exception:
+            pass
+
+
+# ---- helpers ------------------------------------------------------------
+
+def _record(event: dict) -> dict:
+    """Persist an event to the audit store and push it onto the event bus."""
+    stored = store.add(event)
+    try:
+        bus.publish(stored)
+    except Exception:
+        pass
+    return stored
+
+
+def _inspect(text: str, direction: str) -> dict:
+    """Inspect with the configured failure policy (fail-closed vs fail-open)."""
+    try:
+        return engine.inspect(text, direction)
+    except Exception:
+        metrics.inc("aegis_errors_total")
+        if config.FAIL_CLOSED and direction == "input":
+            return schemas.detection_result(
+                direction, "PROMPT_INJECTION", 5, "BLOCKED", ["inspection_error"],
+                text, "Inspection failed; blocked by fail-closed policy.",
+            )
+        return schemas.detection_result(direction, "SAFE", 0, "ALLOWED", [], text, "Inspection skipped (error).")
+
+
+def _completion(content: str, verdict: str = "SAFE") -> dict:
+    return {
+        "id": "aegis-cmpl",
+        "object": "chat.completion",
+        "model": "aegis",
+        "choices": [
+            {"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}
+        ],
+        "aegis": {"verdict": verdict},
+    }
+
+
+def _chunk(delta: dict, finish=None) -> str:
+    obj = {
+        "id": "aegis-cmpl",
+        "object": "chat.completion.chunk",
+        "model": "aegis",
+        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
+    }
+    return "data: " + json.dumps(obj) + "\n\n"
+
+
+def _stream_text(content: str):
+    """Re-stream already-inspected content as OpenAI-compatible chunks.
+
+    Output is buffered and scanned before streaming, so the client only ever
+    receives sanitized tokens — safe streaming without leaking mid-flight.
+    """
+    yield _chunk({"role": "assistant"})
+    for piece in re.findall(r"\S+\s*", content) or [content]:
+        yield _chunk({"content": piece})
+    yield _chunk({}, "stop")
+    yield "data: [DONE]\n\n"
+
+
+def _last_user(messages) -> str:
+    for msg in reversed(messages):
+        if msg.role == "user":
+            return msg.content
+    return messages[-1].content if messages else ""
+
+
+# ---- OpenAI-compatible guarded proxy (auth + rate limit on /v1) ----------
+
+@app.post("/v1/chat/completions", dependencies=[Depends(security.guard)])
+def chat_completions(req: schemas.ChatRequest):
+    metrics.inc("aegis_requests_total")
+    text = _last_user(req.messages)
+    det = _inspect(text, "input")
+    _record(clog.make_event(det, actor="api"))
+
+    if det["action"] == "BLOCKED":
+        metrics.inc("aegis_blocked_total")
+        refusal = f"⚠️ Request blocked by AEGIS ({det['verdict']})."
+        if req.stream:
+            return StreamingResponse(_stream_text(refusal), media_type="text/event-stream")
+        return JSONResponse(
+            _completion(refusal, det["verdict"]),
+            headers={"X-AEGIS-Verdict": det["verdict"], transparency.HEADER: "false"},
+        )
+
+    raw = llm.complete([m.model_dump() for m in req.messages], req.model)
+    out = _inspect(raw, "output")
+    content = raw
+    if out["action"] == "SANITIZED":
+        metrics.inc("aegis_sanitized_total")
+        content = engine.sanitize(raw)
+        _record(clog.make_event(out, actor="api"))
+    else:
+        metrics.inc("aegis_allowed_total")
+
+    content = transparency.inject(content)
+    _record(clog.make_event(schemas.transparency_event(content), actor="api"))
+
+    if req.stream:
+        return StreamingResponse(_stream_text(content), media_type="text/event-stream")
+    return JSONResponse(
+        _completion(content, out["verdict"]),
+        headers={"X-AEGIS-Verdict": out["verdict"], transparency.HEADER: "true"},
+    )
+
+
+# ---- Playground (friendly, full-trace) ----------------------------------
+
+@app.post("/api/chat")
+def api_chat(req: schemas.PlaygroundRequest):
+    metrics.inc("aegis_requests_total")
+    events = []
+
+    if not req.guard:
+        raw = llm.complete(llm.demo_messages(req.text))
+        return {
+            "guard": False, "blocked": False, "input_detection": None, "reply": raw,
+            "output_detection": None, "sanitized": False, "transparency": False, "events": [],
+        }
+
+    det = _inspect(req.text, "input")
+    events.append(_record(clog.make_event(det, actor="playground")))
+
+    if det["action"] == "BLOCKED":
+        metrics.inc("aegis_blocked_total")
+        return {
+            "guard": True, "blocked": True, "input_detection": det,
+            "reply": f"⚠️ Request blocked by AEGIS ({det['verdict']}).",
+            "output_detection": None, "sanitized": False, "transparency": False, "events": events,
+        }
+
+    raw = llm.complete(llm.demo_messages(req.text))
+    out = _inspect(raw, "output")
+    reply = raw
+    sanitized = False
+    if out["action"] == "SANITIZED":
+        metrics.inc("aegis_sanitized_total")
+        reply = engine.sanitize(raw)
+        sanitized = True
+        events.append(_record(clog.make_event(out, actor="playground")))
+    else:
+        metrics.inc("aegis_allowed_total")
+
+    reply = transparency.inject(reply)
+    events.append(_record(clog.make_event(schemas.transparency_event(reply), actor="playground")))
+
+    return {
+        "guard": True, "blocked": False, "input_detection": det, "reply": reply,
+        "output_detection": out, "sanitized": sanitized, "transparency": True, "events": events,
+    }
+
+
+@app.post("/api/inspect")
+def api_inspect(req: schemas.InspectRequest):
+    return engine.inspect(req.text, req.direction)
+
+
+# ---- Event feed / audit / compliance ------------------------------------
+
+@app.get("/api/events")
+def api_events(since: int = 0, limit: int = 100):
+    return store.recent(limit=limit, since=since)
+
+
+@app.get("/api/audit")
+def api_audit():
+    return store.all()
+
+
+@app.get("/api/audit/export")
+def api_export(format: str = "json"):
+    events = store.all()
+    if format == "csv":
+        return PlainTextResponse(
+            cexport.to_csv(events), media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=aegis-audit.csv"},
+        )
+    return PlainTextResponse(
+        cexport.to_json(events), media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=aegis-audit.json"},
+    )
+
+
+@app.get("/api/verify")
+def api_verify():
+    """Tamper-evidence check over the hash-chained audit trail (Art. 12)."""
+    try:
+        return store.verify()
+    except Exception:
+        return {"ok": True, "broken_at": None, "count": store.stats().get("total", 0)}
+
+
+@app.post("/api/_demo/tamper")
+def demo_tamper():
+    """Demo only: silently mutate one mid-chain record so the integrity view can
+    show the hash chain breaking. Sqlite mode only."""
+    if config.use_postgres():
+        return {"ok": False, "reason": "demo tamper available in sqlite mode only"}
+    import sqlite3
+
+    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        ids = [r[0] for r in conn.execute("SELECT id FROM aegis_events ORDER BY id").fetchall()]
+        if not ids:
+            return {"ok": False, "reason": "no events"}
+        target = ids[len(ids) // 2]
+        conn.execute(
+            "UPDATE aegis_events SET ts = '2099-01-01T00:00:00.000000Z' WHERE id = ?",
+            (target,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "tampered_id": target, "verify": store.verify()}
+
+
+@app.post("/api/_demo/reset")
+def demo_reset():
+    """Demo only: clear and re-seed the audit trail to a pristine, intact chain."""
+    store.clear()
+    try:
+        from demo.seed import seed
+        seed(store)
+    except Exception:
+        pass
+    return {"ok": True, "total": store.stats().get("total", 0)}
+
+
+@app.get("/api/score")
+def api_score():
+    return cscore.compute(store)
+
+
+@app.get("/api/frameworks")
+def api_frameworks():
+    """OWASP LLM Top 10 (2025) coverage (live from enabled rules) + ATLAS mapping."""
+    covered = set(detloader.covered_owasp())
+    owasp = [{**o, "covered": o["id"] in covered} for o in schemas.OWASP_TOP10]
+    return {"owasp": owasp, "mapping": schemas.FRAMEWORKS}
+
+
+@app.get("/api/detections")
+def api_detections():
+    return {
+        "rules": detloader.list_rules(),
+        "judge": {"enabled": judge.is_enabled(), "available": judge.available()},
+    }
+
+
+@app.post("/api/detections/judge/toggle")
+def api_detections_judge_toggle():
+    """Pause or resume the LLM judge live (the second detection layer)."""
+    judge.set_enabled(not judge.is_enabled())
+    return {"ok": True, "enabled": judge.is_enabled(), "available": judge.available()}
+
+
+@app.get("/api/detections/raw")
+def api_detections_raw():
+    return PlainTextResponse(detloader.raw_yaml(), media_type="text/yaml")
+
+
+@app.put("/api/detections/raw")
+def api_detections_raw_save(req: schemas.RawRules):
+    """Validate and persist an edited rule pack; never applies an invalid pack."""
+    return detloader.save_raw(req.text)
+
+
+@app.post("/api/detections/{rule_id}/toggle")
+def api_detections_toggle(rule_id: str):
+    return detloader.toggle(rule_id)
+
+
+@app.post("/api/detections/test")
+def api_detections_test(req: schemas.InspectRequest):
+    """Run a prompt against the rules: which fire, and the resulting verdict."""
+    return {"hits": detloader.run(req.text, req.direction), "detection": engine.inspect(req.text, req.direction)}
+
+
+@app.post("/api/benchmark")
+def api_benchmark():
+    """Run the red-team corpus through the guardrail and report caught vs missed."""
+    return benchmark.run_benchmark()
+
+
+@app.get("/api/assess/questions")
+def api_assess_questions():
+    return {"questions": aiact.QUESTIONS}
+
+
+@app.post("/api/assess")
+def api_assess(req: schemas.AssessRequest):
+    """Classify a deployment under the EU AI Act risk tiers (decision support)."""
+    return aiact.classify(req.answers)
+
+
+def _full_stats() -> dict:
+    stats = store.stats()
+    stats["provider"] = llm.provider_info()
+    stats["score"] = cscore.compute(store)
+    return stats
+
+
+@app.get("/api/stats")
+def api_stats():
+    return _full_stats()
+
+
+@app.get("/api/stream")
+async def api_stream():
+    """Server-Sent Events fed by the event bus (in-memory or Redis pub/sub)."""
+
+    def _sse(payload: dict) -> str:
+        return "data: " + json.dumps(payload) + "\n\n"
+
+    async def gen():
+        yield _sse({"type": "init", "events": store.all(), "stats": _full_stats()})
+        async for ev in bus.subscribe():
+            if ev is None:
+                yield ": keepalive\n\n"
+            else:
+                yield _sse({"type": "update", "events": [ev], "stats": _full_stats()})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/attacks")
+def api_attacks():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "demo", "attacks.json"))
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return []
+
+
+@app.get("/metrics")
+def api_metrics():
+    return PlainTextResponse(metrics.render(), media_type="text/plain; version=0.0.4")
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "mode": config.MODE,
+        "provider": llm.provider_info(),
+        "auth": config.AUTH_ENABLED,
+        "store": "postgres" if config.use_postgres() else "sqlite",
+        "bus": "redis" if config.use_redis() else "memory",
+    }
