@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
-from . import config, schemas, llm, transparency, security, metrics, benchmark, aiact
+from . import config, schemas, llm, transparency, security, metrics, benchmark, aiact, endpoints
 from .detection import engine
 from .detection import loader as detloader
 from .detection import judge
@@ -62,10 +62,14 @@ def _record(event: dict) -> dict:
     return stored
 
 
-def _inspect(text: str, direction: str) -> dict:
-    """Inspect with the configured failure policy (fail-closed vs fail-open)."""
+def _inspect(text: str, direction: str, active_ids=None, judge_enabled=None) -> dict:
+    """Inspect with the configured failure policy (fail-closed vs fail-open).
+
+    `active_ids` / `judge_enabled` carry the calling endpoint's armed rule set and
+    judge flag (None falls back to the whole library / global switch).
+    """
     try:
-        return engine.inspect(text, direction)
+        return engine.inspect(text, direction, active_ids, judge_enabled)
     except Exception:
         metrics.inc("aegis_errors_total")
         if config.FAIL_CLOSED and direction == "input":
@@ -120,12 +124,24 @@ def _last_user(messages) -> str:
 
 # ---- OpenAI-compatible guarded proxy (auth + rate limit on /v1) ----------
 
-@app.post("/v1/chat/completions", dependencies=[Depends(security.guard)])
-def chat_completions(req: schemas.ChatRequest):
+def _endpoint_404(slug: str) -> JSONResponse:
+    return JSONResponse(
+        {"error": {"message": f"Unknown AEGIS endpoint '{slug}'.", "type": "invalid_request_error"}},
+        status_code=404,
+    )
+
+
+@app.post("/v1/{slug}/chat/completions", dependencies=[Depends(security.guard)])
+def chat_completions(slug: str, req: schemas.ChatRequest):
     metrics.inc("aegis_requests_total")
+    ep = endpoints.get(slug)
+    if ep is None:
+        return _endpoint_404(slug)
+    active, judge_on = set(ep["rules"]), ep["judge"]
+
     text = _last_user(req.messages)
-    det = _inspect(text, "input")
-    _record(clog.make_event(det, actor="api"))
+    det = _inspect(text, "input", active, judge_on)
+    _record(clog.make_event(det, actor="api", endpoint=slug))
 
     if det["action"] == "BLOCKED":
         metrics.inc("aegis_blocked_total")
@@ -138,17 +154,17 @@ def chat_completions(req: schemas.ChatRequest):
         )
 
     raw = llm.complete([m.model_dump() for m in req.messages], req.model)
-    out = _inspect(raw, "output")
+    out = _inspect(raw, "output", active, judge_on)
     content = raw
     if out["action"] == "SANITIZED":
         metrics.inc("aegis_sanitized_total")
         content = engine.sanitize(raw)
-        _record(clog.make_event(out, actor="api"))
+        _record(clog.make_event(out, actor="api", endpoint=slug))
     else:
         metrics.inc("aegis_allowed_total")
 
     content = transparency.inject(content)
-    _record(clog.make_event(schemas.transparency_event(content), actor="api"))
+    _record(clog.make_event(schemas.transparency_event(content), actor="api", endpoint=slug))
 
     if req.stream:
         return StreamingResponse(_stream_text(content), media_type="text/event-stream")
@@ -172,8 +188,13 @@ def api_chat(req: schemas.PlaygroundRequest):
             "output_detection": None, "sanitized": False, "transparency": False, "events": [],
         }
 
-    det = _inspect(req.text, "input")
-    events.append(_record(clog.make_event(det, actor="playground")))
+    ep = endpoints.get(req.slug) if req.slug else None
+    if ep is None:
+        return JSONResponse({"error": "unknown or missing endpoint slug"}, status_code=400)
+    slug, active, judge_on = ep["slug"], set(ep["rules"]), ep["judge"]
+
+    det = _inspect(req.text, "input", active, judge_on)
+    events.append(_record(clog.make_event(det, actor="playground", endpoint=slug)))
 
     if det["action"] == "BLOCKED":
         metrics.inc("aegis_blocked_total")
@@ -184,19 +205,19 @@ def api_chat(req: schemas.PlaygroundRequest):
         }
 
     raw = llm.complete(llm.demo_messages(req.text))
-    out = _inspect(raw, "output")
+    out = _inspect(raw, "output", active, judge_on)
     reply = raw
     sanitized = False
     if out["action"] == "SANITIZED":
         metrics.inc("aegis_sanitized_total")
         reply = engine.sanitize(raw)
         sanitized = True
-        events.append(_record(clog.make_event(out, actor="playground")))
+        events.append(_record(clog.make_event(out, actor="playground", endpoint=slug)))
     else:
         metrics.inc("aegis_allowed_total")
 
     reply = transparency.inject(reply)
-    events.append(_record(clog.make_event(schemas.transparency_event(reply), actor="playground")))
+    events.append(_record(clog.make_event(schemas.transparency_event(reply), actor="playground", endpoint=slug)))
 
     return {
         "guard": True, "blocked": False, "input_detection": det, "reply": reply,
@@ -206,7 +227,8 @@ def api_chat(req: schemas.PlaygroundRequest):
 
 @app.post("/api/inspect")
 def api_inspect(req: schemas.InspectRequest):
-    return engine.inspect(req.text, req.direction)
+    active = endpoints.active_ids(req.endpoint) if req.endpoint else None
+    return engine.inspect(req.text, req.direction, active)
 
 
 # ---- Event feed / audit / compliance ------------------------------------
@@ -332,9 +354,9 @@ def api_audit_chat(req: schemas.AuditChatRequest):
     # Dogfooding: the assistant is an LLM app, so it runs behind the guardrail too.
     # Rules only here (not the judge): questions about the log naturally mention
     # "attack", "threat", "blocked" and would otherwise trip the model-based judge.
-    det = _inspect(question, "input")
+    det = _inspect(question, "input", active_ids=None, judge_enabled=False)
     if det["action"] == "BLOCKED" and det.get("rule_id") != "llm_judge":
-        _record(clog.make_event(det, actor="assistant"))
+        _record(clog.make_event(det, actor="assistant", endpoint="assistant"))
         verdict = str(det["verdict"]).replace("_", " ")
         return {
             "blocked": True,

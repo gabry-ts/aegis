@@ -39,12 +39,14 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def make_event(detection, actor):
-    """Wrap a detection dict with the acting principal.
+def make_event(detection, actor, endpoint=None):
+    """Wrap a detection dict with the acting principal and originating endpoint.
 
-    The id and ts are assigned later by the store's add(), never here.
+    The id and ts are assigned later by the store's add(), never here. `endpoint`
+    is the slug of the guardrail flow that produced the event (None for events
+    not bound to a specific endpoint, e.g. the dogfooded audit assistant).
     """
-    return {**detection, "actor": actor}
+    return {**detection, "actor": actor, "endpoint": endpoint}
 
 
 def _event_hash(event, prev_hash):

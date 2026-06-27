@@ -59,7 +59,7 @@ def test_hash_chain_verifies_after_writes(client, isolated_store):
 
     # Two guarded round-trips, each appending one or more chained events.
     for text in ("hello there", "what is the weather like today?"):
-        resp = client.post("/api/chat", json={"text": text, "guard": True})
+        resp = client.post("/api/chat", json={"text": text, "guard": True, "slug": "default"})
         assert resp.status_code == 200
 
     # The store must now hold events, and the chain must be intact.
@@ -86,7 +86,7 @@ def test_chat_completions_streaming(client):
         "messages": [{"role": "user", "content": "hello"}],
         "stream": True,
     }
-    with client.stream("POST", "/v1/chat/completions", json=payload) as resp:
+    with client.stream("POST", "/v1/default/chat/completions", json=payload) as resp:
         assert resp.status_code == 200
         body = "".join(resp.iter_text())
 
