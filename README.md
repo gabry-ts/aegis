@@ -55,11 +55,17 @@ npm run dev                   # http://localhost:5173 (proxies /api to :8000)
 
 ## What you get
 
+- **Endpoints** — multiple named guardrail flows, each reached at its own
+  `/v1/{slug}/...`. Every flow arms its own subset of the shared rule library and
+  its own judge setting, and the dashboard, audit and coverage views filter per
+  endpoint over a single tamper-evident chain.
+- **Guardrail board** — the rules of the selected endpoint as a drag-arrange
+  board: toggle to arm a rule for that flow, click to edit the shared definition.
 - **Dashboard** — live threat feed, compliance ledger, severity distribution and
   an AI Act coverage ring, all polling the backend in real time.
-- **Playground** — an attack console with a guard toggle. Turn protection off to
-  see the unprotected model leak its planted secret; turn it on to watch AEGIS
-  block the attack and log the evidence.
+- **Playground** — an attack console with a guard toggle. Pick the endpoint to
+  attack, turn protection off to see the unprotected model leak its planted
+  secret, and on to watch that flow block the attack and log the evidence.
 
 ## Project layout
 
@@ -89,14 +95,29 @@ cd backend && source .venv/bin/activate && pytest -q
 
 ## API
 
-| Method | Path                    | Purpose                                   |
-| ------ | ----------------------- | ----------------------------------------- |
-| POST   | `/v1/chat/completions`  | OpenAI-compatible guarded proxy           |
-| POST   | `/api/chat`             | Playground call (full trace, guard toggle) |
-| POST   | `/api/inspect`          | Run detection without calling the model   |
-| GET    | `/api/events`           | Recent events (polling feed)              |
-| GET    | `/api/audit`            | Full audit log                            |
-| GET    | `/api/audit/export`     | Download report (`?format=json\|csv`)     |
-| GET    | `/api/score`            | AI Act coverage score                     |
-| GET    | `/api/stats`            | Dashboard summary                         |
-| GET    | `/health`               | Liveness + provider info                  |
+Each endpoint is a named guardrail **flow** that selects which rules from the
+shared library are armed and whether the LLM judge runs. The proxy is reached
+per-flow at `/v1/{slug}/chat/completions`, and the read endpoints accept an
+optional `?endpoint=<slug>` filter (omit it for the aggregate, all-endpoints view).
+
+```bash
+curl http://localhost:8000/v1/default/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"hello"}]}'
+```
+
+| Method | Path                                | Purpose                                     |
+| ------ | ----------------------------------- | ------------------------------------------- |
+| POST   | `/v1/{slug}/chat/completions`       | OpenAI-compatible guarded proxy (per flow)  |
+| GET    | `/api/endpoints`                    | List guardrail endpoints (named flows)      |
+| POST   | `/api/endpoints`                    | Create an endpoint                          |
+| PUT    | `/api/endpoints/{slug}`             | Update an endpoint's rules / judge          |
+| DELETE | `/api/endpoints/{slug}`             | Delete an endpoint                          |
+| POST   | `/api/chat`                         | Playground call (full trace, needs `slug`)  |
+| POST   | `/api/inspect`                      | Run detection without calling the model     |
+| GET    | `/api/events`                       | Recent events (`?endpoint=` filter)         |
+| GET    | `/api/audit`                        | Full audit log (`?endpoint=` filter)        |
+| GET    | `/api/audit/export`                 | Download report (`?format=json\|csv`)       |
+| GET    | `/api/score`                        | AI Act coverage score (`?endpoint=` filter) |
+| GET    | `/api/stats`                        | Dashboard summary (`?endpoint=` filter)     |
+| GET    | `/health`                           | Liveness + provider info                    |
