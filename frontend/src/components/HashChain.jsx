@@ -1,79 +1,153 @@
-import { useEffect, useRef } from 'react'
-import { ACTION_COLOR } from './primitives.jsx'
+import { useEffect, useRef, useState } from 'react'
+import { ActionBadge, ArtChip, fmtTime } from './primitives.jsx'
 
-const short = (h) => (h ? h.slice(0, 10) : '—')
-
-const SEAL_LABEL = {
-  'is-broken': 'hash mismatch',
-  'is-stale': 'chain broken above',
-}
+const short = (h) => (h ? h.slice(0, 12) : '—')
+const FILTERS = ['all', 'BLOCKED', 'SANITIZED', 'ALLOWED', 'LOGGED']
+const SEAL_LABEL = { tampered: 'tampered', invalid: 'invalidated', verified: 'verified', sealed: 'sealed' }
+const PAGE = 10
 
 export default function HashChain({ events, phase, brokenAt }) {
-  const brokenIndex = brokenAt != null ? events.findIndex((e) => e.id === brokenAt) : -1
+  const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(0)
   const brokenRef = useRef(null)
 
-  // When a break appears, bring it into view — otherwise it's lost in the wall.
-  useEffect(() => {
-    if (brokenAt == null) return
-    const t = setTimeout(() => {
-      brokenRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 140)
-    return () => clearTimeout(t)
-  }, [brokenAt])
+  // newest record first — the convention for a log you actually read
+  const ordered = [...events].sort((a, b) => b.id - a.id)
+  const rows = filter === 'all' ? ordered : ordered.filter((e) => e.action === filter)
 
-  const animating = phase === 'verified' || phase === 'broken'
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE))
+  const cur = Math.min(page, pageCount - 1)
+  const start = cur * PAGE
+  const pageRows = rows.slice(start, start + PAGE)
 
-  const stateFor = (i) => {
-    if (phase === 'broken' && brokenIndex !== -1) {
-      if (i < brokenIndex) return 'is-ok'
-      if (i === brokenIndex) return 'is-broken'
-      return 'is-stale'
+  const statusOf = (e) => {
+    if (phase === 'broken' && brokenAt != null) {
+      if (e.id === brokenAt) return 'tampered'
+      if (e.id > brokenAt) return 'invalid' // sealed after the break — no longer matches
+      return 'sealed'
     }
-    if (phase === 'verified') return 'is-ok'
-    return 'is-sealed'
+    if (phase === 'verified') return 'verified'
+    return 'sealed'
   }
 
+  const pickFilter = (f) => {
+    setFilter(f)
+    setPage(0)
+  }
+
+  // when the chain breaks, jump to the page holding the tampered record and centre it
+  useEffect(() => {
+    if (brokenAt == null) return
+    setFilter('all')
+    const idx = [...events].sort((a, b) => b.id - a.id).findIndex((e) => e.id === brokenAt)
+    if (idx >= 0) setPage(Math.floor(idx / PAGE))
+    const t = setTimeout(() => {
+      brokenRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' })
+    }, 160)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokenAt])
+
   return (
-    <>
-      <div className="chain-caption mono">
-        {events.length} sealed records · oldest first · each one locked to the previous by its hash
-      </div>
-      <div className="chain">
-        {events.map((e, i) => {
-          const st = stateFor(i)
-          return (
-            <div
-              key={e.id}
-              ref={e.id === brokenAt ? brokenRef : null}
-              className={'chain-block ' + st}
-              style={{ transitionDelay: animating ? `${Math.min(i, 60) * 28}ms` : '0ms' }}
+    <div className="audit-table">
+      <div className="audit-filters">
+        <span className="audit-filters__count mono">
+          {rows.length} record{rows.length === 1 ? '' : 's'}
+        </span>
+        <div className="audit-filters__chips">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={'audit-filter' + (filter === f ? ' is-on' : '')}
+              onClick={() => pickFilter(f)}
             >
-              <div className="chain-block__head">
-                <span className="chain-block__id">#{String(e.id).padStart(3, '0')}</span>
-                <span className={'action-badge action-badge--' + (ACTION_COLOR[e.action] || 'muted')}>
-                  {e.action}
-                </span>
-              </div>
-              <div className="chain-block__hash">
-                <span className="chain-block__k">prev</span>
-                {short(e.prev_hash)}
-              </div>
-              <div className="chain-block__hash is-self">
-                <span className="chain-block__k">hash</span>
-                {short(e.hash)}
-              </div>
-              <div className="chain-block__seal">
-                <span className="chain-block__lock" aria-hidden="true">
-                  <svg viewBox="0 0 16 16">
-                    <path d="M4 7.5h8v5.5H4zM5.6 7.5V5.6a2.4 2.4 0 014.8 0v1.9" />
-                  </svg>
-                </span>
-                {SEAL_LABEL[st] || 'sealed'}
-              </div>
-            </div>
-          )
-        })}
+              {f === 'all' ? 'All' : f}
+            </button>
+          ))}
+        </div>
       </div>
-    </>
+
+      <div className="audit-scroll">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Actor</th>
+              <th>Verdict</th>
+              <th>Action</th>
+              <th>AI Act</th>
+              <th>Hash</th>
+              <th>Sealed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((e) => {
+              const st = statusOf(e)
+              return (
+                <tr
+                  key={e.id}
+                  ref={e.id === brokenAt ? brokenRef : null}
+                  className={'audit-row is-' + st}
+                >
+                  <td className="mono">#{String(e.id).padStart(3, '0')}</td>
+                  <td className="mono c-muted">{fmtTime(e.ts)}</td>
+                  <td>{e.actor}</td>
+                  <td className="mono">{String(e.verdict || '').replace(/_/g, ' ')}</td>
+                  <td>
+                    <ActionBadge action={e.action} />
+                  </td>
+                  <td>{e.ai_act ? <ArtChip article={e.ai_act} /> : <span className="c-faint">—</span>}</td>
+                  <td className="mono c-muted">{short(e.hash)}…</td>
+                  <td>
+                    <span className={'seal-tag seal-tag--' + st}>
+                      <span className="seal-tag__dot" />
+                      {SEAL_LABEL[st]}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan="8" className="audit-empty c-muted">
+                  No {filter.toLowerCase()} records.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="audit-pager">
+          <span className="audit-pager__info mono">
+            {start + 1}–{Math.min(start + PAGE, rows.length)} of {rows.length}
+          </span>
+          <button
+            type="button"
+            className="audit-pager__btn"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={cur === 0}
+            aria-label="Previous page"
+          >
+            ‹
+          </button>
+          <span className="audit-pager__page mono">
+            {cur + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className="audit-pager__btn"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={cur >= pageCount - 1}
+            aria-label="Next page"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

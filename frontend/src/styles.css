@@ -2347,6 +2347,144 @@ input[type='text']:focus-visible {
   color: var(--amber);
 }
 
+/* audit log — filterable table view */
+.audit-table {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.audit-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.audit-filters__count {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.audit-filters__chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.audit-filter {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t), border-color var(--t), background var(--t);
+}
+.audit-filter:hover {
+  color: var(--ink);
+}
+.audit-filter.is-on {
+  color: var(--iris-ink);
+  border-color: var(--iris);
+  background: var(--iris-fill);
+}
+.audit-scroll {
+  max-height: clamp(420px, 62vh, 760px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.audit-scroll .ledger-table {
+  font-size: 0.82rem;
+}
+.audit-row td {
+  transition: background var(--t), opacity var(--t);
+}
+.audit-row.is-tampered td {
+  background: var(--red-fill);
+}
+.audit-row.is-tampered td:first-child {
+  font-weight: 700;
+  color: var(--red);
+}
+.audit-row.is-invalid td {
+  opacity: 0.5;
+}
+.seal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--green);
+}
+.seal-tag__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px -1px var(--green);
+}
+.seal-tag--tampered {
+  color: var(--red);
+}
+.seal-tag--tampered .seal-tag__dot {
+  background: var(--red);
+  box-shadow: 0 0 6px -1px var(--red);
+}
+.seal-tag--invalid {
+  color: var(--amber);
+}
+.seal-tag--invalid .seal-tag__dot {
+  background: var(--amber);
+  box-shadow: none;
+}
+.audit-empty {
+  text-align: center;
+  padding: 28px;
+}
+.audit-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.audit-pager__info {
+  margin-right: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.audit-pager__page {
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  min-width: 44px;
+  text-align: center;
+}
+.audit-pager__btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+.audit-pager__btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--muted);
+  color: var(--ink);
+}
+.audit-pager__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ============================================================
    Toaster
    ============================================================ */
