@@ -1,8 +1,9 @@
 import { ActionBadge, ArtChip, fmtTime } from './primitives'
 import { exportUrl } from '../api'
 import { toast } from '../toast'
+import type { AuditEvent } from '../types'
 
-export default function ComplianceLedger({ events }) {
+export default function ComplianceLedger({ events }: { events: AuditEvent[] }) {
   const rows = [...events].slice(-60).reverse()
 
   return (
