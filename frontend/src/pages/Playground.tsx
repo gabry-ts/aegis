@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getAttacks } from '../api'
+import type { Attack } from '../types'
 import AttackConsole from '../components/AttackConsole'
 import EndpointSwitcher from '../components/EndpointSwitcher'
 import { useEndpoints } from '../context/EndpointsContext'
 
 export default function Playground() {
   const { endpoints, current, setCurrent } = useEndpoints()
-  const [attacks, setAttacks] = useState([])
+  const [attacks, setAttacks] = useState<Attack[]>([])
 
   useEffect(() => {
     getAttacks()
