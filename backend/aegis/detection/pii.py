@@ -35,6 +35,13 @@ _PATTERNS = [
         re.compile(r"\b(?:sk|pk|rk|api|key|token|secret)[-_][A-Za-z0-9]{16,}\b", re.IGNORECASE),
     ),
     (
+        # Italian tax code (codice fiscale): 6 letters, 2 digits, month letter,
+        # 2 digits, area letter, 3 digits, checksum letter. Specific enough to
+        # carry a very low false-positive rate.
+        "codice_fiscale",
+        re.compile(r"\b[A-Z]{6}\d{2}[A-EHLMPRST]\d{2}[A-Z]\d{3}[A-Z]\b"),
+    ),
+    (
         "iban",
         re.compile(r"\b[A-Z]{2}\d{2}[ ]?(?:[A-Z0-9]{4}[ ]?){2,7}[A-Z0-9]{1,4}\b"),
     ),
@@ -49,13 +56,32 @@ _PATTERNS = [
 ]
 
 
+def _luhn_ok(value: str) -> bool:
+    """True if the digits in `value` satisfy the Luhn checksum (card numbers).
+
+    Used to reject the many 13-16 digit runs that the broad card regex would
+    otherwise flag (order numbers, ids, concatenated values).
+    """
+    digits = [int(c) for c in value if c.isdigit()]
+    if len(digits) < 13:
+        return False
+    checksum = 0
+    for i, d in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
+
+
 def scan(text: str) -> List[Dict]:
     """Return every PII hit in `text` as `{"name", "match"}`.
 
     Patterns are evaluated in priority order; a span already claimed by an
     earlier (more specific) pattern is not re-reported by a later, broader
     one. This keeps a single token from showing up as both, e.g., an IBAN and
-    a phone number.
+    a phone number. Candidate card numbers must also pass the Luhn checksum.
     """
     text = text or ""
     claimed: List[tuple] = []
@@ -64,6 +90,8 @@ def scan(text: str) -> List[Dict]:
         for m in pattern.finditer(text):
             start, end = m.start(), m.end()
             if any(start < c_end and end > c_start for c_start, c_end in claimed):
+                continue
+            if name == "credit_card" and not _luhn_ok(m.group(0)):
                 continue
             claimed.append((start, end))
             hits.append({"name": name, "match": m.group(0)})

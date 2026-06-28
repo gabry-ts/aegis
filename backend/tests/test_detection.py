@@ -6,7 +6,7 @@ They exercise the canonical detection-result dict produced by
 """
 
 from aegis import config
-from aegis.detection import engine
+from aegis.detection import engine, pii
 
 
 def test_prompt_injection_is_blocked():
@@ -52,3 +52,21 @@ def test_detection_dict_shape():
     }
     assert set(det.keys()) == expected_keys
     assert det["direction"] == "input"
+
+
+def test_valid_credit_card_is_detected_and_redacted():
+    card = "4242 4242 4242 4242"  # passes the Luhn checksum
+    hits = pii.scan(card)
+    assert any(h["name"] == "credit_card" for h in hits)
+    assert pii.REDACTION in pii.redact(card, "")
+
+
+def test_non_card_digit_run_is_not_flagged_as_card():
+    # A 14-digit value failing the Luhn check must not be reported as a card.
+    hits = pii.scan("order 12345678901234 shipped")
+    assert not any(h["name"] == "credit_card" for h in hits)
+
+
+def test_codice_fiscale_is_detected():
+    hits = pii.scan("tax code RSSMRA85T10A562S on file")
+    assert any(h["name"] == "codice_fiscale" for h in hits)
