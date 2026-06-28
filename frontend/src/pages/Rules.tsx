@@ -14,6 +14,9 @@ import RuleList from '../components/rules/RuleList'
 import RuleInspector from '../components/rules/RuleInspector'
 import { blankRule, rulesToYaml } from '../components/rules/rulesYaml'
 import { toast } from '../toast'
+import type { DetectionResult, EndpointUpstream, Rule } from '../types'
+
+type SaveState = { ok: true } | { ok: false; error?: string }
 
 function useNarrow() {
   const [narrow, setNarrow] = useState(
@@ -29,7 +32,7 @@ function useNarrow() {
 }
 
 // A short, readable target label for an endpoint's upstream.
-function upstreamLabel(up) {
+function upstreamLabel(up?: EndpointUpstream | null): string {
   if (!up || !up.base_url) return '→ default backend'
   let host = up.base_url
   try {
@@ -47,19 +50,19 @@ export default function Rules() {
 
   // The shared rule library (definitions, editable) and, separately, which of
   // those rules are armed for the selected endpoint plus its judge flag.
-  const [library, setLibrary] = useState([])
-  const [armed, setArmed] = useState(() => new Set())
+  const [library, setLibrary] = useState<Rule[]>([])
+  const [armed, setArmed] = useState<Set<string>>(() => new Set())
   const [judge, setJudge] = useState(false)
   const [judgeAvailable, setJudgeAvailable] = useState(false)
 
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [saveState, setSaveState] = useState(null)
+  const [saveState, setSaveState] = useState<SaveState | null>(null)
   const [testText, setTestText] = useState('')
-  const [testRes, setTestRes] = useState(null)
+  const [testRes, setTestRes] = useState<DetectionResult | null>(null)
   const [testing, setTesting] = useState(false)
-  const [hitIds, setHitIds] = useState(() => new Set())
+  const [hitIds, setHitIds] = useState<Set<string>>(() => new Set())
   const [resetKey, setResetKey] = useState(0)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -68,7 +71,7 @@ export default function Rules() {
   const [nameDraft, setNameDraft] = useState('')
   const [upstreamDraft, setUpstreamDraft] = useState({ base_url: '', model: '', api_key_env: '' })
   const narrow = useNarrow()
-  const loadedSlugRef = useRef(null)
+  const loadedSlugRef = useRef<string | null>(null)
 
   const currentEp = useMemo(
     () => endpoints.find((e) => e.slug === current) || null,
@@ -96,7 +99,7 @@ export default function Rules() {
     setArmed(new Set(currentEp.rules || []))
     setJudge(!!currentEp.judge)
     setNameDraft(currentEp.name || '')
-    const up = currentEp.upstream || {}
+    const up = currentEp.upstream
     setUpstreamDraft({
       base_url: up.base_url || '',
       model: up.model || '',
@@ -124,7 +127,7 @@ export default function Rules() {
     [library, armed],
   )
 
-  const onToggle = useCallback((id) => {
+  const onToggle = useCallback((id: string) => {
     setArmed((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -139,7 +142,7 @@ export default function Rules() {
     setDirty(true)
   }, [])
 
-  const onChangeRule = useCallback((id, p) => {
+  const onChangeRule = useCallback((id: string, p: Partial<Rule>) => {
     setLibrary((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)))
     setDirty(true)
   }, [])
@@ -154,7 +157,7 @@ export default function Rules() {
     setDirty(true)
   }, [])
 
-  const onDelete = useCallback((id) => {
+  const onDelete = useCallback((id: string) => {
     setLibrary((rs) => rs.filter((r) => r.id !== id))
     setArmed((prev) => {
       const next = new Set(prev)
@@ -197,7 +200,7 @@ export default function Rules() {
     }
   }
 
-  const switchTo = (slug) => {
+  const switchTo = (slug: string | null) => {
     if (!slug || slug === current) return
     if (dirty) toast('Unsaved changes discarded', 'info')
     loadedSlugRef.current = null
@@ -258,7 +261,7 @@ export default function Rules() {
     setBusy(true)
     try {
       const u = await updateEndpoint(current, {
-        name: nameDraft.trim() || currentEp.name,
+        name: nameDraft.trim() || currentEp?.name,
         upstream: {
           base_url: upstreamDraft.base_url.trim() || null,
           model: upstreamDraft.model.trim() || null,
