@@ -25,6 +25,10 @@ def test_seeded_endpoints_have_empty_upstream():
 
 
 def test_create_with_upstream_persists_and_tracks_key(monkeypatch):
+    from aegis import config
+
+    # An admin allows the custom credential env var name (closed allowlist).
+    monkeypatch.setattr(config, "UPSTREAM_KEY_ENVS", ["AEGIS_TEST_UPSTREAM_KEY"])
     monkeypatch.setenv("AEGIS_TEST_UPSTREAM_KEY", "sk-not-a-real-key")
     r = endpoints.create(
         name="Up Test",
@@ -48,6 +52,29 @@ def test_create_with_upstream_persists_and_tracks_key(monkeypatch):
         assert endpoints.get("up-test")["upstream"]["key_present"] is False
     finally:
         endpoints.delete("up-test")
+
+
+def test_upstream_rejects_unsafe_values(monkeypatch):
+    """An endpoint cannot reference an env var outside the allowlist (no env-var
+    exfiltration) and cannot target a private/metadata host (SSRF guard)."""
+    from aegis import config
+
+    monkeypatch.setattr(config, "UPSTREAM_KEY_ENVS", ["OPENAI_API_KEY"])
+    monkeypatch.setattr(config, "ALLOW_PRIVATE_UPSTREAM", False)
+    endpoints.create(
+        name="Bad Up",
+        slug="bad-up",
+        upstream={
+            "base_url": "http://169.254.169.254/latest/meta-data",
+            "api_key_env": "DATABASE_URL",
+        },
+    )
+    try:
+        up = endpoints.get("bad-up")["upstream"]
+        assert up.get("api_key_env") is None
+        assert up["base_url"] is None
+    finally:
+        endpoints.delete("bad-up")
 
 
 def test_update_can_clear_upstream():

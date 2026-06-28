@@ -46,7 +46,18 @@ AUDIT_HASH_CHAIN = _flag("AEGIS_AUDIT_HASH_CHAIN", True)
 API_KEYS = _list("AEGIS_API_KEYS")                    # bearer tokens accepted on /v1
 AUTH_ENABLED = _flag("AEGIS_AUTH_ENABLED", bool(API_KEYS))
 RATE_LIMIT_RPM = int(os.getenv("AEGIS_RATE_LIMIT_RPM", "0"))  # 0 disables
-CORS_ORIGINS = _list("AEGIS_CORS_ORIGINS", "*")       # ["*"] by default
+CORS_ORIGINS = _list("AEGIS_CORS_ORIGINS", "http://localhost:5173")
+
+# Control plane (/api/*). When AEGIS_ADMIN_API_KEY is set, mutating admin routes
+# require the X-API-Key header. Empty = open (only safe on a trusted network).
+ADMIN_API_KEY = os.getenv("AEGIS_ADMIN_API_KEY", "").strip()
+
+# ---- upstream forwarding safety ----------------------------------------
+# An endpoint may only reference these env var NAMES for its upstream credential
+# (stops exfiltrating arbitrary process env vars), and forwarding to private /
+# loopback / metadata hosts is blocked unless explicitly allowed (SSRF guard).
+UPSTREAM_KEY_ENVS = _list("AEGIS_UPSTREAM_KEY_ENVS", "OPENAI_API_KEY,REGOLO_API_KEY")
+ALLOW_PRIVATE_UPSTREAM = _flag("AEGIS_ALLOW_PRIVATE_UPSTREAM", False)
 
 
 def use_regolo() -> bool:

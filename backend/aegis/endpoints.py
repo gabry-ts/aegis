@@ -18,6 +18,7 @@ import threading
 
 import yaml
 
+from . import security
 from .detection import loader
 
 _PATH = os.path.join(os.path.dirname(__file__), "endpoints.yaml")
@@ -70,16 +71,25 @@ def _defaults():
 def _norm_upstream(raw):
     """Normalize an upstream block to {base_url, model, api_key_env}.
 
-    Only the env-var *name* is ever stored, never a raw secret. Non-string or
-    empty fields are dropped; a missing/invalid block becomes {}.
+    Only the env-var *name* is ever stored, never a raw secret. Unsafe values are
+    dropped: a base_url that isn't a well-formed public http(s) target, or an
+    api_key_env outside the allowlist (so an endpoint can never reference an
+    arbitrary process env var). Non-string / empty fields are dropped; a missing
+    or invalid block becomes {}.
     """
     if not isinstance(raw, dict):
         return {}
     out = {}
     for key in ("base_url", "model", "api_key_env"):
         value = raw.get(key)
-        if isinstance(value, str) and value.strip():
-            out[key] = value.strip()
+        if not (isinstance(value, str) and value.strip()):
+            continue
+        value = value.strip()
+        if key == "base_url" and not security.is_wellformed_upstream_url(value):
+            continue
+        if key == "api_key_env" and not security.is_allowed_key_env(value):
+            continue
+        out[key] = value
     return out
 
 

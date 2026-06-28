@@ -80,10 +80,18 @@ def _upstream_args(ep: dict) -> dict:
     """
     up = ep.get("upstream") or {}
     env = up.get("api_key_env")
+    base_url = up.get("base_url")
+    api_key = os.getenv(env) if security.is_allowed_key_env(env) else None
+    # Authoritative SSRF gate, resolved at the moment of use: never forward to a
+    # private / loopback / metadata target. On failure fall back to the global
+    # provider rather than leaking the credential to an unsafe host.
+    if base_url and not security.is_safe_upstream_url(base_url):
+        base_url = None
+        api_key = None
     return {
         "model": up.get("model"),
-        "base_url": up.get("base_url"),
-        "api_key": os.getenv(env) if env else None,
+        "base_url": base_url,
+        "api_key": api_key,
     }
 
 
@@ -311,7 +319,7 @@ def api_verify():
         return {"ok": True, "broken_at": None, "count": store.stats().get("total", 0)}
 
 
-@app.post("/api/_demo/tamper")
+@app.post("/api/_demo/tamper", dependencies=[Depends(security.admin_guard)])
 def demo_tamper():
     """Demo only: silently mutate one mid-chain record so the integrity view can
     show the hash chain breaking. Sqlite mode only."""
@@ -335,7 +343,7 @@ def demo_tamper():
     return {"ok": True, "tampered_id": target, "verify": store.verify()}
 
 
-@app.post("/api/_demo/reset")
+@app.post("/api/_demo/reset", dependencies=[Depends(security.admin_guard)])
 def demo_reset():
     """Demo only: clear and re-seed the audit trail to a pristine, intact chain."""
     store.clear()
@@ -453,7 +461,7 @@ def api_endpoints():
     return {"endpoints": endpoints.list_endpoints()}
 
 
-@app.post("/api/endpoints")
+@app.post("/api/endpoints", dependencies=[Depends(security.admin_guard)])
 def api_endpoints_create(req: schemas.EndpointCreate):
     return endpoints.create(
         name=req.name, slug=req.slug, description=req.description,
@@ -463,7 +471,7 @@ def api_endpoints_create(req: schemas.EndpointCreate):
     )
 
 
-@app.put("/api/endpoints/{slug}")
+@app.put("/api/endpoints/{slug}", dependencies=[Depends(security.admin_guard)])
 def api_endpoints_update(slug: str, req: schemas.EndpointUpdate):
     return endpoints.update(
         slug, name=req.name, description=req.description, rules=req.rules, judge=req.judge,
@@ -472,23 +480,23 @@ def api_endpoints_update(slug: str, req: schemas.EndpointUpdate):
     )
 
 
-@app.delete("/api/endpoints/{slug}")
+@app.delete("/api/endpoints/{slug}", dependencies=[Depends(security.admin_guard)])
 def api_endpoints_delete(slug: str):
     return endpoints.delete(slug)
 
 
-@app.post("/api/endpoints/{slug}/rules/{rule_id}/toggle")
+@app.post("/api/endpoints/{slug}/rules/{rule_id}/toggle", dependencies=[Depends(security.admin_guard)])
 def api_endpoints_rule_toggle(slug: str, rule_id: str):
     """Arm or disarm a library rule for this endpoint (per-endpoint membership)."""
     return endpoints.toggle_rule(slug, rule_id)
 
 
-@app.post("/api/endpoints/{slug}/judge/toggle")
+@app.post("/api/endpoints/{slug}/judge/toggle", dependencies=[Depends(security.admin_guard)])
 def api_endpoints_judge_toggle(slug: str):
     return endpoints.toggle_judge(slug)
 
 
-@app.post("/api/detections/judge/toggle")
+@app.post("/api/detections/judge/toggle", dependencies=[Depends(security.admin_guard)])
 def api_detections_judge_toggle():
     """Pause or resume the LLM judge live (the second detection layer)."""
     judge.set_enabled(not judge.is_enabled())
@@ -500,13 +508,13 @@ def api_detections_raw():
     return PlainTextResponse(detloader.raw_yaml(), media_type="text/yaml")
 
 
-@app.put("/api/detections/raw")
+@app.put("/api/detections/raw", dependencies=[Depends(security.admin_guard)])
 def api_detections_raw_save(req: schemas.RawRules):
     """Validate and persist an edited rule pack; never applies an invalid pack."""
     return detloader.save_raw(req.text)
 
 
-@app.post("/api/detections/{rule_id}/toggle")
+@app.post("/api/detections/{rule_id}/toggle", dependencies=[Depends(security.admin_guard)])
 def api_detections_toggle(rule_id: str):
     return detloader.toggle(rule_id)
 
