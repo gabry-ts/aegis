@@ -3,8 +3,21 @@
 // pointer-and-zoom only, unusable on a phone or by keyboard).
 
 import { ACTION_COLOR } from './rulesYaml'
+import type { Rule } from '../../types'
 
-export default function RuleList({ rules, hitIds, selectedId, onToggle, onSelect }) {
+export default function RuleList({
+  rules,
+  hitIds,
+  selectedId,
+  onToggle,
+  onSelect,
+}: {
+  rules: Rule[]
+  hitIds: Set<string>
+  selectedId: string | null
+  onToggle: (id: string) => void
+  onSelect: (id: string) => void
+}) {
   return (
     <ul className="rule-mlist">
       {rules.map((r) => {
