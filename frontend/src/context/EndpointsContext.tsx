@@ -3,15 +3,17 @@
 // choice survives reloads; kept valid when endpoints are created or deleted.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { getEndpoints } from '../api.js'
+import type { Endpoint, EndpointsContextValue } from '../types'
 
 const KEY = 'aegis.endpoint.current'
-const Ctx = createContext(null)
+const Ctx = createContext<EndpointsContextValue | null>(null)
 
-export function EndpointsProvider({ children }) {
-  const [endpoints, setEndpoints] = useState([])
+export function EndpointsProvider({ children }: { children: ReactNode }) {
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [current, setCurrentState] = useState(() => {
+  const [current, setCurrentState] = useState<string | null>(() => {
     try {
       return localStorage.getItem(KEY) || null
     } catch {
@@ -19,7 +21,7 @@ export function EndpointsProvider({ children }) {
     }
   })
 
-  const setCurrent = useCallback((slug) => {
+  const setCurrent = useCallback((slug: string | null) => {
     setCurrentState(slug)
     try {
       if (slug) localStorage.setItem(KEY, slug)
@@ -56,14 +58,14 @@ export function EndpointsProvider({ children }) {
     refresh()
   }, [refresh])
 
-  const value = useMemo(
+  const value = useMemo<EndpointsContextValue>(
     () => ({ endpoints, loading, current, setCurrent, refresh }),
     [endpoints, loading, current, setCurrent, refresh],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
-export function useEndpoints() {
+export function useEndpoints(): EndpointsContextValue {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('useEndpoints must be used within an EndpointsProvider')
   return ctx
