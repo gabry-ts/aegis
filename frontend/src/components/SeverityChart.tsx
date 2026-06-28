@@ -7,7 +7,7 @@ const COLORS = [
   'var(--red)',
 ]
 
-export default function SeverityChart({ hist }) {
+export default function SeverityChart({ hist }: { hist?: number[] }) {
   const data = Array.isArray(hist) && hist.length === 6 ? hist : [0, 0, 0, 0, 0, 0]
   const max = Math.max(1, ...data)
 
