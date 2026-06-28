@@ -36,6 +36,16 @@ store = clog.store
 bus = eventbus.bus
 
 
+async def _retention_loop() -> None:
+    """Re-run the retention prune roughly once a day for long-lived deployments."""
+    while True:
+        await asyncio.sleep(24 * 3600)
+        try:
+            store.prune(config.AUDIT_RETENTION_DAYS)
+        except Exception:
+            pass
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     try:
@@ -46,6 +56,17 @@ async def _startup() -> None:
         try:
             from demo.seed import seed
             seed(store)
+        except Exception:
+            pass
+    # Storage limitation (GDPR Art. 5(1)(e)): purge stale audit events at boot and
+    # keep purging on a daily cadence. Disabled when AUDIT_RETENTION_DAYS is 0.
+    if config.AUDIT_RETENTION_DAYS > 0:
+        try:
+            store.prune(config.AUDIT_RETENTION_DAYS)
+        except Exception:
+            pass
+        try:
+            asyncio.create_task(_retention_loop())
         except Exception:
             pass
 
@@ -385,10 +406,14 @@ def _audit_context(limit: int = 60) -> str:
         "ai_act_score_percent": cscore.compute(store.all()).get("percent"),
     }
     recent = events[-limit:]
+    # Defence in depth: excerpts are already redacted at rest (see make_event),
+    # but the assistant forwards them to a possibly third-party LLM (GDPR Arts.
+    # 28/44-49), so re-run the redaction here too. It is idempotent, and it also
+    # covers any legacy row persisted before redaction was added.
     rows = [
         f"#{e.get('id')} {e.get('ts', '')} actor={e.get('actor')} verdict={e.get('verdict')} "
         f"action={e.get('action')} sev={e.get('severity')} ai_act={e.get('ai_act') or '-'} "
-        f"text={(e.get('excerpt') or '')[:90]!r}"
+        f"text={engine.sanitize(e.get('excerpt') or '')[:90]!r}"
         for e in recent
     ]
     return (

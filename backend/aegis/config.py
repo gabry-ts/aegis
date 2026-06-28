@@ -41,6 +41,9 @@ REDIS_URL = os.getenv("REDIS_URL", "").strip()        # redis://...       (else 
 SEED = _flag("AEGIS_SEED", True)
 # Tamper-evident audit: hash-chain every event (Art. 12 record integrity).
 AUDIT_HASH_CHAIN = _flag("AEGIS_AUDIT_HASH_CHAIN", True)
+# Storage limitation (GDPR Art. 5(1)(e)): drop audit events older than this many
+# days. 0 disables retention so the default behaviour is unchanged (opt-in).
+AUDIT_RETENTION_DAYS = int(os.getenv("AEGIS_AUDIT_RETENTION_DAYS", "0"))
 
 # ---- API security -------------------------------------------------------
 API_KEYS = _list("AEGIS_API_KEYS")                    # bearer tokens accepted on /v1

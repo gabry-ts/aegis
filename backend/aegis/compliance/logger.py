@@ -27,16 +27,31 @@ import sqlite3
 import sys
 import threading
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .. import config
+from ..detection import pii
 
 _write_lock = threading.Lock()
+
+# Free-text fields that may carry user prompts or model output verbatim and so
+# must be redacted before an event is persisted (data minimization).
+_REDACTED_FIELDS = ("excerpt", "explanation")
 
 
 def _utc_now() -> str:
     """Current UTC time as an ISO-8601 string ending in 'Z'."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def _retention_cutoff(retention_days: int) -> str:
+    """ISO-8601 timestamp `retention_days` in the past.
+
+    Event timestamps are zero-padded ISO-8601, so a lexicographic `ts < cutoff`
+    comparison is also chronological — no date parsing needed in SQL.
+    """
+    moment = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def make_event(detection, actor, endpoint=None):
@@ -45,8 +60,20 @@ def make_event(detection, actor, endpoint=None):
     The id and ts are assigned later by the store's add(), never here. `endpoint`
     is the slug of the guardrail flow that produced the event (None for events
     not bound to a specific endpoint, e.g. the dogfooded audit assistant).
+
+    Free-text fields (excerpt, explanation) carry the user prompt / model output
+    verbatim, so they are redacted on the persisted copy: PII and the configured
+    secret never reach the audit store, the CSV/JSON export or the SSE feed
+    (GDPR Art. 5(1)(c) data minimization, Art. 32 security). The shallow copy
+    leaves the caller's original detection dict untouched, so the Playground's
+    synchronous, self-submitted trace still shows the raw text.
     """
-    return {**detection, "actor": actor, "endpoint": endpoint}
+    event = {**detection, "actor": actor, "endpoint": endpoint}
+    for field in _REDACTED_FIELDS:
+        value = event.get(field)
+        if isinstance(value, str) and value:
+            event[field] = pii.redact(value, config.AEGIS_SECRET)
+    return event
 
 
 def _event_hash(event, prev_hash):
@@ -113,8 +140,14 @@ def _verify_chain(events):
     Returns {"ok", "broken_at", "count"}. `broken_at` is the id of the first
     event whose stored hash does not match the recomputed one, or None if the
     chain is intact (or hash-chaining was never applied).
+
+    The chain is seeded from the first event's own `prev_hash` rather than the
+    empty string: for a full chain the first event has prev_hash="" so nothing
+    changes, but after a retention prune removes the oldest prefix the first
+    surviving event still links to the (now deleted) predecessor's hash, and the
+    retained window must verify against that link instead of against "".
     """
-    prev_hash = ""
+    prev_hash = events[0].get("prev_hash", "") if events else ""
     for ev in events:
         expected = _event_hash(ev, prev_hash)
         stored = ev.get("hash")
@@ -255,6 +288,22 @@ class SqliteStore:
             conn.commit()
         self._last_hash = ""
 
+    def prune(self, retention_days):
+        """Delete events older than `retention_days`; return how many were removed.
+
+        0 (or anything non-positive) disables retention and is a no-op. Only the
+        oldest prefix is ever removed — ts grows with id — so the retained hash
+        chain stays contiguous and the live chain head (_last_hash) is unaffected.
+        """
+        if not retention_days or retention_days <= 0:
+            return 0
+        cutoff = _retention_cutoff(retention_days)
+        with _write_lock, closing(self._connect()) as conn:
+            cur = conn.execute("DELETE FROM aegis_events WHERE ts < ?", (cutoff,))
+            removed = cur.rowcount
+            conn.commit()
+        return removed
+
 
 class PostgresStore:
     """Audit log backed by PostgreSQL via psycopg.
@@ -393,6 +442,22 @@ class PostgresStore:
                 cur.execute("DELETE FROM aegis_events")
             conn.commit()
         self._last_hash = ""
+
+    def prune(self, retention_days):
+        """Delete events older than `retention_days`; return how many were removed.
+
+        Mirrors SqliteStore.prune: 0 disables retention, only the oldest prefix is
+        removed, and the retained hash chain stays contiguous.
+        """
+        if not retention_days or retention_days <= 0:
+            return 0
+        cutoff = _retention_cutoff(retention_days)
+        with _write_lock, closing(self._connect()) as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM aegis_events WHERE ts < %s", (cutoff,))
+                removed = cur.rowcount
+            conn.commit()
+        return removed
 
 
 def make_store():
