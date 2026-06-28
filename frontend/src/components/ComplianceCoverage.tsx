@@ -1,4 +1,6 @@
-export default function ComplianceCoverage({ score }) {
+import type { ScoreResponse } from '../types'
+
+export default function ComplianceCoverage({ score }: { score?: ScoreResponse }) {
   const articles = score?.articles ?? []
   const percent = score?.percent ?? 0
   const total = articles.reduce((s, a) => s + (a.evidence || 0), 0)
