@@ -2,8 +2,10 @@
 // as a patch; the parent owns the rule list and the dirty flag.
 
 import { SURFACES, ACTIONS, DETECTORS, VERDICTS } from './rulesYaml'
+import type { ReactNode } from 'react'
+import type { Rule, RuleAction, RuleDetector, RuleMapping, Surface } from '../../types'
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="insp-field">
       <span className="insp-field__label">{label}</span>
@@ -13,10 +15,21 @@ function Field({ label, children, hint }) {
   )
 }
 
-export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
+export default function RuleInspector({
+  rule,
+  onChange,
+  onDelete,
+  onClose,
+}: {
+  rule: Rule | null
+  onChange: (id: string, patch: Partial<Rule>) => void
+  onDelete: (id: string) => void
+  onClose: () => void
+}) {
   if (!rule) return null
-  const patch = (p) => onChange(rule.id, p)
-  const setMapping = (k, v) => patch({ mapping: { ...rule.mapping, [k]: v } })
+  const patch = (p: Partial<Rule>) => onChange(rule.id, p)
+  const setMapping = (k: keyof RuleMapping, v: string) =>
+    patch({ mapping: { ...rule.mapping, [k]: v } })
 
   return (
     <aside className="inspector">
@@ -58,7 +71,7 @@ export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
 
         <div className="insp-grid">
           <Field label="Surface">
-            <select value={rule.surface} onChange={(e) => patch({ surface: e.target.value })}>
+            <select value={rule.surface} onChange={(e) => patch({ surface: e.target.value as Surface })}>
               {SURFACES.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -67,7 +80,7 @@ export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
             </select>
           </Field>
           <Field label="Action">
-            <select value={rule.action} onChange={(e) => patch({ action: e.target.value })}>
+            <select value={rule.action} onChange={(e) => patch({ action: e.target.value as RuleAction })}>
               {ACTIONS.map((a) => (
                 <option key={a} value={a}>
                   {a}
@@ -93,7 +106,7 @@ export default function RuleInspector({ rule, onChange, onDelete, onClose }) {
         </Field>
 
         <Field label="Detector">
-          <select value={rule.detector} onChange={(e) => patch({ detector: e.target.value })}>
+          <select value={rule.detector} onChange={(e) => patch({ detector: e.target.value as RuleDetector })}>
             {DETECTORS.map((d) => (
               <option key={d} value={d}>
                 {d}
