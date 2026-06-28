@@ -9,10 +9,11 @@ AEGIS is a guardrail proxy for LLM applications. It also works as an EU AI Act
 compliance layer.
 
 It sits in front of any OpenAI-compatible LLM and inspects every request and
-response. It blocks prompt injection, jailbreaks and data exfiltration, strips
-leaked PII and secrets, adds the AI disclosure the Act requires, and writes a
-tamper-evident audit trail. Every event is both a security signal and a piece of
-compliance evidence.
+response. It blocks prompt injection, jailbreaks and data exfiltration, redacts
+common structured PII (email, phone, IBAN, card numbers, API keys) and leaked
+secrets, adds the AI disclosure the Act requires, and writes a tamper-evident
+audit trail. Every event is both a security signal and a piece of compliance
+evidence.
 
 ```
   Your LLM app  ──▶  AEGIS proxy  ──▶  Regolo AI (or any OpenAI-compatible model)
@@ -31,11 +32,19 @@ key.
 | ---------- | --------------------------------------------------------------------- | --------------------------------------------------- |
 | Art. 15(5) | Prevent / detect / respond to model evasion & confidentiality attacks | Detection engine (injection, jailbreak, PII/secret) |
 | Art. 12    | Automatic record-keeping / logging                                    | Compliance logger + hash-chained JSON/CSV audit     |
-| Art. 50    | Disclose AI-generated content                                         | Transparency injector + `X-AI-Generated` header     |
+| Art. 50    | Disclose AI-generated content (partial, see note)                     | Human disclosure + machine-readable marker + `X-AI-Generated` header |
 
 > Scope note: Art. 15 applies to high-risk systems (Annex III) and to GPAI used
 > in those domains. AEGIS is the control layer that makes a high-risk deployment
 > compliant; it is not a blanket obligation for every chatbot.
+>
+> PII redaction covers common structured identifiers (email, phone, IBAN, card
+> numbers, API keys, Italian codice fiscale). It is not a full DLP product and
+> does not detect free-text names or special-category (Art. 9) data on its own.
+>
+> Art. 50 marking is partial: AEGIS adds a human-readable disclosure, a
+> machine-readable in-body marker and an `X-AI-Generated` header, but not a
+> cryptographic provenance standard such as C2PA / Content Credentials.
 
 ## Quick start
 
@@ -140,6 +149,19 @@ from the allowlist, so a crafted endpoint cannot drive SSRF or read arbitrary
 process environment variables. Report vulnerabilities privately as described in
 [SECURITY.md](SECURITY.md).
 
+## Privacy & data protection
+
+AEGIS inspects prompt and response excerpts and keeps them as audit evidence, so
+it processes personal data. Audit events are redacted at rest (structured PII and
+the configured secret are stripped before anything is written), no client IP is
+persisted, and retention is configurable through `AEGIS_AUDIT_RETENTION_DAYS`.
+
+When you deploy AEGIS you are the data controller, and a hosted upstream model is
+your processor. [PRIVACY.md](PRIVACY.md) walks through the data flows, legal
+basis, retention, transfers and data subject rights, and
+[docs/DPA-template.md](docs/DPA-template.md) gives a controller-to-processor
+agreement you can adapt.
+
 ## Project layout
 
 ```
@@ -151,7 +173,7 @@ backend/
     schemas.py         request models + AI Act vocabulary
     llm.py             dual-mode model client (mock / Regolo / per-endpoint upstream)
     endpoints.py       named guardrail-flow registry (endpoints.yaml)
-    transparency.py    Art. 50 disclosure
+    transparency.py    Art. 50 disclosure (human + machine-readable marker)
     aiact.py           risk-tier self-assessment
     detection/         rules · pii · judge · engine · loader (editable rule pack)
     compliance/        logger (sqlite/postgres) · export · score · bus
