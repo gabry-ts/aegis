@@ -5,7 +5,7 @@ import App from './App.jsx'
 import { EndpointsProvider } from './context/EndpointsContext.jsx'
 import './styles.css'
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <EndpointsProvider>
