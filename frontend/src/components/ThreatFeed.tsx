@@ -1,6 +1,7 @@
 import { ArtChip, EmptyState, Sev, VerdictBadge, ActionBadge, fmtTime } from './primitives'
+import type { AuditEvent } from '../types'
 
-export default function ThreatFeed({ events }) {
+export default function ThreatFeed({ events }: { events: AuditEvent[] }) {
   const threats = events.filter((e) => e.verdict !== 'SAFE').slice(-40).reverse()
 
   if (!threats.length) {
