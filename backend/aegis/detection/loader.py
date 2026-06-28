@@ -165,10 +165,16 @@ def toggle(rule_id):
     return {"ok": True, "id": rule_id, "enabled": enabled}
 
 
+# User-authored regex are bounded to this many characters per scan so a pattern
+# with catastrophic backtracking cannot hang a worker on a long crafted input.
+_MAX_REGEX_SCAN = 8192
+
+
 def _detect(rule, text):
     det = rule["detector"]
     if det == "regex":
-        return any(p.search(text) for p in rule["_compiled"])
+        scan = text[:_MAX_REGEX_SCAN]
+        return any(p.search(scan) for p in rule["_compiled"])
     if det == "keyword":
         low = text.lower()
         return any(str(k).lower() in low for k in rule.get("keywords", []))
