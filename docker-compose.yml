@@ -1,0 +1,33 @@
+# Run the whole stack locally: docker compose up --build
+# Frontend (nginx) is the only exposed port; it reverse-proxies the API to the
+# backend over the internal network. Open http://localhost:8080.
+services:
+  backend:
+    build: ./backend
+    image: ghcr.io/gabry-ts/aegis-backend:latest
+    environment:
+      AEGIS_MODE: mock
+      DB_PATH: /data/aegis.db
+      AEGIS_CORS_ORIGINS: http://localhost:8080
+    volumes:
+      - aegis-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    image: ghcr.io/gabry-ts/aegis-frontend:latest
+    environment:
+      BACKEND_UPSTREAM: backend:8000
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  aegis-data:

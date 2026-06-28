@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+*.db
+.env
+tests/
+run.sh
+Dockerfile
+.dockerignore

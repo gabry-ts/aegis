@@ -1,0 +1,38 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # SPA: serve static assets, fall back to index.html for client-side routes.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Server-sent events: keep the connection open and unbuffered.
+    location /api/stream {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 24h;
+    }
+
+    # Control plane (/api), data plane (/v1) and liveness proxied to the backend.
+    location /api/ {
+        proxy_pass http://${BACKEND_UPSTREAM};
+    }
+    location /v1/ {
+        proxy_pass http://${BACKEND_UPSTREAM};
+    }
+    location /health {
+        proxy_pass http://${BACKEND_UPSTREAM};
+    }
+}
