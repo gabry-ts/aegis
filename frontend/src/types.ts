@@ -165,11 +165,11 @@ export interface EndpointsResponse {
   endpoints: Endpoint[]
 }
 
-/** Upstream patch sent by the settings form (all optional). */
+/** Upstream patch sent by the settings form (all optional; null clears a field). */
 export interface UpstreamInput {
-  base_url?: string
-  model?: string
-  api_key_env?: string
+  base_url?: string | null
+  model?: string | null
+  api_key_env?: string | null
 }
 
 export interface EndpointCreateBody {

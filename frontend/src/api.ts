@@ -137,7 +137,7 @@ export const toggleJudge = (): Promise<ToggleJudgeResult> =>
 export const testDetection = (
   text: string,
   direction: Direction = 'input',
-  endpoint?: string,
+  endpoint?: string | null,
 ): Promise<TestDetectionResponse> =>
   fetch('/api/detections/test', {
     method: 'POST',
