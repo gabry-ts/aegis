@@ -8,12 +8,13 @@ import ComplianceCoverage from '../components/ComplianceCoverage'
 import EndpointSwitcher from '../components/EndpointSwitcher'
 import { useEndpoints } from '../context/EndpointsContext'
 import { streamUrl } from '../api'
+import type { AuditEvent, StatsResponse, StreamMessage } from '../types'
 
 export default function Dashboard() {
   const { endpoints } = useEndpoints()
-  const [filter, setFilter] = useState(null) // null = all endpoints
-  const [stats, setStats] = useState(null)
-  const [events, setEvents] = useState(null)
+  const [filter, setFilter] = useState<string | null>(null) // null = all endpoints
+  const [stats, setStats] = useState<StatsResponse | null>(null)
+  const [events, setEvents] = useState<AuditEvent[] | null>(null)
 
   useEffect(() => {
     // Real-time push over a single SSE connection, scoped to the selected
@@ -22,7 +23,7 @@ export default function Dashboard() {
     setStats(null)
     const es = new EventSource(streamUrl(filter))
     es.onmessage = (e) => {
-      let msg
+      let msg: StreamMessage
       try {
         msg = JSON.parse(e.data)
       } catch {
