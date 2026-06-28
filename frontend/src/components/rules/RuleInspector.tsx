@@ -19,11 +19,13 @@ export default function RuleInspector({
   rule,
   onChange,
   onDelete,
+  onRemoveFromBoard,
   onClose,
 }: {
   rule: Rule | null
   onChange: (id: string, patch: Partial<Rule>) => void
   onDelete: (id: string) => void
+  onRemoveFromBoard: (id: string) => void
   onClose: () => void
 }) {
   if (!rule) return null
@@ -178,6 +180,14 @@ export default function RuleInspector({
       </div>
 
       <footer className="inspector__foot">
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => onRemoveFromBoard(rule.id)}
+          title="Take this rule off the board for this endpoint (it stays in the library)"
+        >
+          Remove from board
+        </button>
         <button
           type="button"
           className="btn btn--ghost insp-delete"

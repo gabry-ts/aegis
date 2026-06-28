@@ -12,6 +12,7 @@ import EndpointSwitcher from '../components/EndpointSwitcher'
 import RuleCanvas from '../components/rules/RuleCanvas'
 import RuleList from '../components/rules/RuleList'
 import RuleInspector from '../components/rules/RuleInspector'
+import RuleLibrary from '../components/rules/RuleLibrary'
 import { blankRule, rulesToYaml } from '../components/rules/rulesYaml'
 import { toast } from '../toast'
 import type { DetectionResult, EndpointUpstream, Rule } from '../types'
@@ -54,6 +55,9 @@ export default function Rules() {
   const [armed, setArmed] = useState<Set<string>>(() => new Set())
   const [judge, setJudge] = useState(false)
   const [judgeAvailable, setJudgeAvailable] = useState(false)
+  // Board membership: which library rules sit on this endpoint's board. null
+  // means the whole library is on the board (armed rules are always on it).
+  const [board, setBoard] = useState<Set<string> | null>(null)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -68,6 +72,7 @@ export default function Rules() {
   const [newName, setNewName] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const [showUpstream, setShowUpstream] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [upstreamDraft, setUpstreamDraft] = useState({ base_url: '', model: '', api_key_env: '' })
   const narrow = useNarrow()
@@ -97,6 +102,7 @@ export default function Rules() {
     if (!currentEp || loadedSlugRef.current === currentEp.slug) return
     loadedSlugRef.current = currentEp.slug
     setArmed(new Set(currentEp.rules || []))
+    setBoard(currentEp.board ? new Set(currentEp.board) : null)
     setJudge(!!currentEp.judge)
     setNameDraft(currentEp.name || '')
     const up = currentEp.upstream
@@ -123,8 +129,11 @@ export default function Rules() {
   // What the board renders: library definitions with `enabled` standing in for
   // "armed for this endpoint", so the canvas dims and wires them accordingly.
   const boardRules = useMemo(
-    () => library.map((r) => ({ ...r, enabled: armed.has(r.id) })),
-    [library, armed],
+    () =>
+      library
+        .filter((r) => board === null || board.has(r.id) || armed.has(r.id))
+        .map((r) => ({ ...r, enabled: armed.has(r.id) })),
+    [library, armed, board],
   )
 
   const onToggle = useCallback((id: string) => {
@@ -152,6 +161,7 @@ export default function Rules() {
       const r = blankRule(rs.map((x) => x.id))
       setSelectedId(r.id)
       setArmed((prev) => new Set(prev).add(r.id))
+      setBoard((prev) => (prev === null ? null : new Set(prev).add(r.id)))
       return [...rs, r]
     })
     setDirty(true)
@@ -164,9 +174,47 @@ export default function Rules() {
       next.delete(id)
       return next
     })
+    setBoard((prev) => {
+      if (prev === null) return null
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
     setSelectedId((cur) => (cur === id ? null : cur))
     setDirty(true)
   }, [])
+
+  // Soft removal: take a rule off this endpoint's board but keep its definition
+  // in the library (and disarm it, since an off-board rule cannot be active).
+  const removeFromBoard = useCallback(
+    (id: string) => {
+      setBoard((prev) => {
+        const next = new Set(prev ?? library.map((r) => r.id))
+        next.delete(id)
+        return next
+      })
+      setArmed((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setDirty(true)
+    },
+    [library],
+  )
+
+  const addToBoard = useCallback(
+    (id: string) => {
+      setBoard((prev) => {
+        const next = new Set(prev ?? library.map((r) => r.id))
+        next.add(id)
+        return next
+      })
+      setSelectedId(id)
+      setDirty(true)
+    },
+    [library],
+  )
 
   const onSave = async () => {
     if (!current) return
@@ -181,7 +229,11 @@ export default function Rules() {
         toast(r.error || 'Invalid rule pack', 'error')
         return
       }
-      const u = await updateEndpoint(current, { rules: [...armed], judge })
+      const u = await updateEndpoint(current, {
+        rules: [...armed],
+        judge,
+        board: board === null ? undefined : [...board],
+      })
       if (!u.ok) {
         setSaveState({ ok: false, error: u.error })
         toast(u.error || 'Could not save endpoint', 'error')
@@ -522,6 +574,14 @@ export default function Rules() {
           >
             Reset layout
           </button>
+          <button
+            type="button"
+            className={'btn ' + (showLibrary ? 'btn--blue' : 'btn--ghost')}
+            onClick={() => setShowLibrary((s) => !s)}
+            title="Browse the full rule library and add or remove rules from this board"
+          >
+            Library ({library.length})
+          </button>
           <button type="button" className="btn btn--ghost" onClick={onAdd}>
             + Add rule
           </button>
@@ -562,7 +622,20 @@ export default function Rules() {
             rule={selectedRule}
             onChange={onChangeRule}
             onDelete={onDelete}
+            onRemoveFromBoard={removeFromBoard}
             onClose={() => setSelectedId(null)}
+          />
+        )}
+        {showLibrary && (
+          <RuleLibrary
+            rules={library}
+            board={board}
+            armed={armed}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAddToBoard={addToBoard}
+            onRemoveFromBoard={removeFromBoard}
+            onClose={() => setShowLibrary(false)}
           />
         )}
       </div>
