@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { auditChat } from '../api'
+import type { Verdict } from '../types'
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  blocked?: boolean
+  verdict?: Verdict
+  error?: boolean
+}
 
 const SUGGESTIONS = [
   'How many attacks did we block?',
@@ -10,21 +19,22 @@ const SUGGESTIONS = [
 
 export default function Assistant() {
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const bodyRef = useRef(null)
-  const inputRef = useRef(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight })
+    const el = bodyRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight })
   }, [messages, busy])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
 
-  const send = async (q) => {
+  const send = async (q?: string) => {
     const question = (q ?? input).trim()
     if (!question || busy) return
     setInput('')
