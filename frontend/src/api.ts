@@ -48,7 +48,7 @@ export const getHealth = (): Promise<HealthResponse> => fetch('/health').then(js
 export const streamUrl = (endpoint?: string): string =>
   `/api/stream${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ''}`
 
-export const chat = (text: string, guard = true, slug?: string): Promise<ChatResponse> =>
+export const chat = (text: string, guard = true, slug?: string | null): Promise<ChatResponse> =>
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

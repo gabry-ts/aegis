@@ -109,18 +109,22 @@ export type StreamMessage =
 
 // ---- chat & assistant ------------------------------------------------------
 
-/** Full-trace response from POST /api/chat (playground). */
+/**
+ * Full-trace response from POST /api/chat (playground). Success fields are
+ * optional because the client also handles the backend 400 variant and a local
+ * network-failure sentinel through this same shape.
+ */
 export interface ChatResponse {
-  guard: boolean
-  blocked: boolean
-  input_detection: DetectionResult | null
-  output_detection: DetectionResult | null
-  reply: string
-  sanitized: boolean
-  transparency: boolean
-  events: AuditEvent[]
-  /** Present only on the HTTP 400 error variant ({ error }). */
-  error?: string
+  guard?: boolean
+  blocked?: boolean
+  input_detection?: DetectionResult | null
+  output_detection?: DetectionResult | null
+  reply?: string
+  sanitized?: boolean
+  transparency?: boolean
+  events?: AuditEvent[]
+  /** Backend 400 sends a string message; the client sets `true` on a network failure. */
+  error?: string | boolean
 }
 
 /** Response from POST /api/audit/chat (audit assistant). */
