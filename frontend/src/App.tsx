@@ -8,8 +8,21 @@ import Assessment from './pages/Assessment'
 import Rules from './pages/Rules'
 import Toaster from './components/Toaster'
 import Assistant from './components/Assistant'
+import type { StatsResponse } from './types'
 
-const SECTIONS = [
+interface SubItem {
+  to: string
+  label: string
+}
+interface Section {
+  label: string
+  caption: string
+  base: string
+  paths: string[]
+  subs: SubItem[]
+}
+
+const SECTIONS: Section[] = [
   { label: 'Dashboard', caption: 'live activity', base: '/', paths: ['/'], subs: [] },
   { label: 'Playground', caption: 'attack it live', base: '/playground', paths: ['/playground'], subs: [] },
   {
@@ -31,7 +44,7 @@ const SECTIONS = [
   },
 ]
 
-function activeSection(pathname) {
+function activeSection(pathname: string): Section {
   return SECTIONS.find((s) => s.paths.includes(pathname)) || SECTIONS[0]
 }
 
@@ -57,7 +70,7 @@ function SubNav() {
 }
 
 export default function App() {
-  const [meta, setMeta] = useState(null)
+  const [meta, setMeta] = useState<StatsResponse | null>(null)
   const [offline, setOffline] = useState(false)
   const { pathname } = useLocation()
   const section = activeSection(pathname)
