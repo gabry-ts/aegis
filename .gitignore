@@ -19,3 +19,11 @@ dist/
 
 # OS
 .DS_Store
+
+# Internal — not part of the public repo
+.claude/
+CLAUDE.md
+.impeccable/
+DESIGN.md
+PRODUCT.md
+presentation/
