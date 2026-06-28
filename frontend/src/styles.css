@@ -3542,6 +3542,9 @@ input[type='text']:focus-visible {
 .inspector__foot {
   padding: 12px 14px;
   border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .insp-delete {
   width: 100%;
