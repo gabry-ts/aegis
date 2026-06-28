@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { chat } from '../api'
 import LiveFire from './LiveFire'
+import type { Attack, ChatResponse, ColorToken } from '../types'
 
-const KIND_COLOR = {
+const KIND_COLOR: Record<string, ColorToken> = {
   PROMPT_INJECTION: 'amber',
   JAILBREAK: 'amber',
   DATA_EXFILTRATION: 'red',
@@ -10,22 +11,34 @@ const KIND_COLOR = {
   SAFE: 'green',
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-export default function AttackConsole({ attacks, slug }) {
+interface PlayInfo {
+  i: number
+  total: number
+  label: string
+}
+
+export default function AttackConsole({
+  attacks,
+  slug,
+}: {
+  attacks: Attack[]
+  slug?: string | null
+}) {
   const [text, setText] = useState('')
   const [guard, setGuard] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [res, setRes] = useState(null)
+  const [res, setRes] = useState<ChatResponse | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [playInfo, setPlayInfo] = useState(null)
+  const [playInfo, setPlayInfo] = useState<PlayInfo | null>(null)
 
   const runIdRef = useRef(0)
   const playingRef = useRef(false)
-  const attacksRef = useRef([])
+  const attacksRef = useRef<Attack[]>([])
   attacksRef.current = attacks
   // Read the live slug inside async loops so a mid-play endpoint switch lands.
-  const slugRef = useRef(slug)
+  const slugRef = useRef<string | null | undefined>(slug)
   slugRef.current = slug
 
   useEffect(
@@ -37,10 +50,10 @@ export default function AttackConsole({ attacks, slug }) {
   )
 
   // Fire one prompt and surface the real trace, ignoring stale runs.
-  const fire = async (txt, g, myId) => {
+  const fire = async (txt: string, g: boolean, myId: number): Promise<ChatResponse | null> => {
     setLoading(true)
     setRes(null)
-    let r
+    let r: ChatResponse
     try {
       r = await chat(txt, g, slugRef.current)
     } catch {
