@@ -1,0 +1,16 @@
+AEGIS — LLM Guardrail & EU AI Act Console
+Copyright 2026 Gabriele Partiti (gabry-ts)
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+---
+
+Third-party notice — GSAP
+
+The frontend uses GSAP (https://gsap.com) for animation. GSAP is distributed
+under the GreenSock "Standard No Charge" license, which is NOT an OSI-approved
+open source license. GSAP source is not redistributed in this repository
+(node_modules is gitignored); its terms govern your own build and runtime use.
+See https://gsap.com/community/standard-license/ for details. To keep the
+project's distributable fully under a permissive license, GSAP can be replaced
+with CSS / the Web Animations API.
