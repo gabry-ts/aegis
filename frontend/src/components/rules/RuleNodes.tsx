@@ -2,10 +2,38 @@
 // draggable detector blocks that hang off them (RuleNode).
 
 import { Handle, Position } from '@xyflow/react'
+import type { Node, NodeProps } from '@xyflow/react'
+import type { ReactNode } from 'react'
 import { Sev, ArtChip } from '../primitives'
 import { ACTION_COLOR } from './rulesYaml'
+import type { StageIcon } from './rulesYaml'
+import type { Rule } from '../../types'
 
-const STAGE_ICON = {
+export type StageNodeData = {
+  id: string
+  title: string
+  sub: string
+  icon: StageIcon
+  surface?: 'input' | 'output'
+}
+export type RuleNodeData = {
+  rule: Rule
+  hit: boolean
+  selected: boolean
+  onToggle: (id: string) => void
+}
+export type JudgeState = { enabled: boolean; available: boolean }
+export type JudgeNodeData = {
+  judge: JudgeState
+  onToggle: () => void
+}
+
+export type StageNodeType = Node<StageNodeData, 'stage'>
+export type RuleNodeType = Node<RuleNodeData, 'rule'>
+export type JudgeNodeType = Node<JudgeNodeData, 'judge'>
+export type AegisNode = StageNodeType | RuleNodeType | JudgeNodeType
+
+const STAGE_ICON: Record<StageIcon, ReactNode> = {
   prompt: <path d="M5 6l4 4-4 4M11 15h5" />,
   shield: <path d="M10 3l6 2.5V10c0 4.2-6 7-6 7s-6-2.8-6-7V5.5L10 3z" />,
   chip: <path d="M6.5 6.5h7v7h-7zM10 3v3.5M10 13.5V17M3 10h3.5M13.5 10H17" />,
@@ -18,7 +46,7 @@ const STAGE_ICON = {
   ledger: <path d="M4.5 5h11M4.5 10h11M4.5 15h7" />,
 }
 
-export function StageNode({ data }) {
+export function StageNode({ data }: NodeProps<StageNodeType>) {
   const { title, sub, icon, surface } = data
   return (
     <div className={'rf-stage' + (surface ? ' rf-stage--anchor' : '')}>
@@ -39,7 +67,7 @@ export function StageNode({ data }) {
 }
 
 // The LLM judge: the model-based second opinion, as its own armable block.
-export function JudgeNode({ data }) {
+export function JudgeNode({ data }: NodeProps<JudgeNodeType>) {
   const { judge, onToggle } = data
   const on = !!judge?.enabled
   return (
@@ -73,7 +101,7 @@ export function JudgeNode({ data }) {
   )
 }
 
-export function RuleNode({ data }) {
+export function RuleNode({ data }: NodeProps<RuleNodeType>) {
   const { rule, hit, selected, onToggle } = data
   const color = ACTION_COLOR[rule.action] || 'muted'
   const cls = [
