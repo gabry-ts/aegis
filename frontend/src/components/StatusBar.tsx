@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import type { StatsResponse } from '../types'
 
-function useCountUp(value, duration = 600) {
+function useCountUp(value: number, duration = 600): number {
   const [display, setDisplay] = useState(value)
   const fromRef = useRef(value)
   const rafRef = useRef(0)
@@ -11,7 +12,7 @@ function useCountUp(value, duration = 600) {
     if (from === to) return
     const start = performance.now()
     cancelAnimationFrame(rafRef.current)
-    const tick = (now) => {
+    const tick = (now: number) => {
       const t = Math.min(1, (now - start) / duration)
       const eased = 1 - Math.pow(1 - t, 3)
       setDisplay(Math.round(from + (to - from) * eased))
@@ -28,7 +29,7 @@ function useCountUp(value, duration = 600) {
   return display
 }
 
-function Metric({ label, value, c }) {
+function Metric({ label, value, c }: { label: string; value?: number; c: string }) {
   const n = useCountUp(value ?? 0)
   return (
     <div className="statusbar__item">
@@ -38,7 +39,7 @@ function Metric({ label, value, c }) {
   )
 }
 
-export default function StatusBar({ stats }) {
+export default function StatusBar({ stats }: { stats: StatsResponse | null }) {
   const isRegolo = stats?.provider?.regolo
   const mode = isRegolo ? 'Regolo AI' : 'Mock · offline'
   const model = stats?.provider?.model ?? '—'
