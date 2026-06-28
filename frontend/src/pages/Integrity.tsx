@@ -4,13 +4,14 @@ import HashChain from '../components/HashChain'
 import EndpointSwitcher from '../components/EndpointSwitcher'
 import { useEndpoints } from '../context/EndpointsContext'
 import { toast } from '../toast'
+import type { AuditEvent } from '../types'
 
 export default function Integrity() {
   const { endpoints } = useEndpoints()
-  const [epFilter, setEpFilter] = useState(null) // null = all endpoints
-  const [events, setEvents] = useState([])
-  const [phase, setPhase] = useState('idle')
-  const [brokenAt, setBrokenAt] = useState(null)
+  const [epFilter, setEpFilter] = useState<string | null>(null) // null = all endpoints
+  const [events, setEvents] = useState<AuditEvent[]>([])
+  const [phase, setPhase] = useState<'idle' | 'verifying' | 'verified' | 'broken'>('idle')
+  const [brokenAt, setBrokenAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
 
   const load = async () => {
