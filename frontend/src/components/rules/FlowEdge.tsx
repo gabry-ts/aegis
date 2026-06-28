@@ -3,8 +3,19 @@
 // Pure CSS animation, so prefers-reduced-motion freezes it into a calm dotted line.
 
 import { getSmoothStepPath } from '@xyflow/react'
+import type { Edge, EdgeProps } from '@xyflow/react'
+import type { CSSProperties } from 'react'
 
-const SIGNAL = {
+export type FlowEdgeData = {
+  variant?: 'spine' | 'rule' | 'judge'
+  color?: 'red' | 'amber' | 'blue' | 'iris' | 'green' | 'muted'
+  hit?: boolean
+  active?: boolean
+  enabled?: boolean
+}
+export type FlowEdgeType = Edge<FlowEdgeData, 'flow'>
+
+const SIGNAL: Record<NonNullable<FlowEdgeData['color']>, string> = {
   red: 'var(--red)',
   amber: 'var(--amber)',
   blue: 'var(--blue)',
@@ -21,7 +32,7 @@ export default function FlowEdge({
   sourcePosition,
   targetPosition,
   data,
-}) {
+}: EdgeProps<FlowEdgeType>) {
   const [path] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -31,7 +42,7 @@ export default function FlowEdge({
     targetPosition,
     borderRadius: 14,
   })
-  const color = SIGNAL[data?.color] || SIGNAL.muted
+  const color = (data?.color && SIGNAL[data.color]) || SIGNAL.muted
   const cls = [
     'rf-edge',
     'rf-edge--' + (data?.variant || 'rule'),
@@ -43,7 +54,7 @@ export default function FlowEdge({
     .join(' ')
 
   return (
-    <g className={cls} style={{ '--ec': color }}>
+    <g className={cls} style={{ '--ec': color } as CSSProperties}>
       <path className="rf-edge__base" d={path} fill="none" />
       <path className="rf-edge__flow" d={path} fill="none" />
     </g>
