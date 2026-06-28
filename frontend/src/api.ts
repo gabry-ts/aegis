@@ -45,7 +45,7 @@ export const getScore = (endpoint?: string): Promise<ScoreResponse> =>
   fetch(`/api/score?${epq(endpoint)}`).then(json)
 export const getAttacks = (): Promise<Attack[]> => fetch('/api/attacks').then(json)
 export const getHealth = (): Promise<HealthResponse> => fetch('/health').then(json)
-export const streamUrl = (endpoint?: string): string =>
+export const streamUrl = (endpoint?: string | null): string =>
   `/api/stream${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ''}`
 
 export const chat = (text: string, guard = true, slug?: string | null): Promise<ChatResponse> =>
