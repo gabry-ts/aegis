@@ -12,7 +12,7 @@ import { useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import gsap from 'gsap'
 import { ArtChip, Sev, VerdictBadge } from './primitives'
-import type { AuditEvent, ChatResponse, DetectionResult } from '../types'
+import type { AuditEvent, ChatResponse, ChatTrace, DetectionResult } from '../types'
 
 type StageKey = 'ingest' | 'input' | 'llm' | 'output' | 'disclosure' | 'audit'
 type LiveFireKind = 'blocked' | 'sanitized' | 'allowed' | 'unprotected'
@@ -89,7 +89,7 @@ function shortHash(h?: string) {
 }
 
 // derive the human verdict + the per-stage readout lines from the raw trace
-function read(res: ChatResponse, guard: boolean | undefined): LiveFireModel {
+function read(res: ChatTrace, guard: boolean): LiveFireModel {
   const di = (res.input_detection || {}) as DetectionResult
   const od = (res.output_detection || {}) as DetectionResult
   const ev = (res.events || []).filter((e) => e.hash)
@@ -183,7 +183,7 @@ export default function LiveFire({ res, loading }: { res: ChatResponse | null; l
   const linkRefs = useRef<(HTMLSpanElement | null)[]>([])
   const packetRef = useRef<HTMLSpanElement>(null)
 
-  const model = res && !res.error ? read(res, res.guard) : null
+  const model = res && !('error' in res) ? read(res, res.guard) : null
 
   useLayoutEffect(() => {
     if (!model || !rootRef.current) return
@@ -380,7 +380,7 @@ export default function LiveFire({ res, loading }: { res: ChatResponse | null; l
     )
   }
 
-  if (res?.error) {
+  if (res && 'error' in res) {
     return (
       <div className="livefire">
         <div className="lf-banner lf-banner--blocked">

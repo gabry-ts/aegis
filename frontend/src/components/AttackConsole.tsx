@@ -57,7 +57,7 @@ export default function AttackConsole({
     try {
       r = await chat(txt, g, slugRef.current)
     } catch {
-      r = { error: true }
+      r = { error: 'request failed' }
     }
     if (runIdRef.current !== myId) return null
     setRes(r)
