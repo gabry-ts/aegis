@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
+import type { ToastDetail, ToastKind } from '../toast'
+
+interface ToastItem {
+  id: number
+  message: string
+  kind: ToastKind
+}
 
 let seq = 0
 
 export default function Toaster() {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState<ToastItem[]>([])
 
   useEffect(() => {
-    const onToast = (e) => {
+    const onToast = (e: CustomEvent<ToastDetail>) => {
       const id = ++seq
-      const { message, kind } = e.detail || {}
+      const { message, kind } = e.detail
       setItems((x) => [...x, { id, message, kind: kind || 'info' }])
       setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), 3200)
     }
