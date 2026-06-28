@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { assess, getAssessQuestions } from '../api'
 import { toast } from '../toast'
+import type { AssessQuestion, AssessResult, ColorToken } from '../types'
 
-const TIER_COLOR = { prohibited: 'red', high_risk: 'amber', limited: 'blue', minimal: 'green' }
-const AEGIS_LABEL = { yes: 'AEGIS ✓', partial: 'AEGIS partial', no: 'out of scope', na: '—' }
+const TIER_COLOR: Record<string, ColorToken> = {
+  prohibited: 'red',
+  high_risk: 'amber',
+  limited: 'blue',
+  minimal: 'green',
+}
+const AEGIS_LABEL: Record<string, string> = {
+  yes: 'AEGIS ✓',
+  partial: 'AEGIS partial',
+  no: 'out of scope',
+  na: '—',
+}
 
 export default function Assessment() {
-  const [questions, setQuestions] = useState([])
-  const [answers, setAnswers] = useState({})
-  const [result, setResult] = useState(null)
+  const [questions, setQuestions] = useState<AssessQuestion[]>([])
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [result, setResult] = useState<AssessResult | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -16,7 +27,7 @@ export default function Assessment() {
       .then((d) => {
         const qs = d.questions || []
         setQuestions(qs)
-        const init = {}
+        const init: Record<string, string> = {}
         qs.forEach((q) => {
           init[q.id] = q.options[0]?.value
         })
@@ -25,7 +36,7 @@ export default function Assessment() {
       .catch(() => {})
   }, [])
 
-  const set = (id, v) => setAnswers((a) => ({ ...a, [id]: v }))
+  const set = (id: string, v: string) => setAnswers((a) => ({ ...a, [id]: v }))
 
   const run = async () => {
     setBusy(true)
