@@ -3,12 +3,14 @@
 // only needs to be correct, not clever: every string is double-quoted with
 // the two escapes YAML requires, which safely carries regex metacharacters.
 
-export const SURFACES = ['input', 'output']
-export const ACTIONS = ['block', 'sanitize', 'flag']
-export const DETECTORS = ['regex', 'keyword', 'secret', 'pii']
+import type { ColorToken, Rule, RuleAction, RuleDetector, Surface } from '../../types'
+
+export const SURFACES: Surface[] = ['input', 'output']
+export const ACTIONS: RuleAction[] = ['block', 'sanitize', 'flag']
+export const DETECTORS: RuleDetector[] = ['regex', 'keyword', 'secret', 'pii']
 
 // Common verdict labels offered as suggestions; the field stays free-form.
-export const VERDICTS = [
+export const VERDICTS: string[] = [
   'PROMPT_INJECTION',
   'JAILBREAK',
   'DATA_EXFILTRATION',
@@ -18,11 +20,25 @@ export const VERDICTS = [
   'RESOURCE_ABUSE',
 ]
 
-export const ACTION_COLOR = { block: 'red', sanitize: 'amber', flag: 'blue' }
+export const ACTION_COLOR: Record<RuleAction, ColorToken> = {
+  block: 'red',
+  sanitize: 'amber',
+  flag: 'blue',
+}
+
+export type StageIcon = 'prompt' | 'shield' | 'chip' | 'scan' | 'ledger'
+
+export interface Stage {
+  id: string
+  title: string
+  sub: string
+  icon: StageIcon
+  surface?: Surface
+}
 
 // The fixed pipeline backbone. Input-surface rules hang off `input_detection`,
 // output-surface rules off `output_scan`.
-export const STAGES = [
+export const STAGES: Stage[] = [
   { id: 'ingress', title: 'Incoming request', sub: 'user input', icon: 'prompt' },
   { id: 'input_detection', title: 'Input detection', sub: 'rules · judge', icon: 'shield', surface: 'input' },
   { id: 'model', title: 'LLM', sub: 'mock / Regolo', icon: 'chip' },
@@ -30,13 +46,13 @@ export const STAGES = [
   { id: 'audit', title: 'Audit log', sub: 'record-keeping', icon: 'ledger' },
 ]
 
-const STAGE_X = { ingress: 40, input_detection: 360, model: 720, output_scan: 1080, audit: 1420 }
+const STAGE_X: Record<string, number> = { ingress: 40, input_detection: 360, model: 720, output_scan: 1080, audit: 1420 }
 const STAGE_Y = 40
 const RULE_TOP = 220
 const RULE_STEP = 150
 const RULE_COL_W = 268
 
-export function stagePosition(id) {
+export function stagePosition(id: string) {
   return { x: STAGE_X[id] ?? 0, y: STAGE_Y }
 }
 
@@ -50,7 +66,7 @@ export function judgePosition() {
 // Default position for a rule node, hung under its anchor stage. Input-surface
 // rules stagger across two columns to keep the lane short and readable, and
 // start one row below the judge node; output-surface rules stay single-column.
-export function defaultRulePosition(surface, order) {
+export function defaultRulePosition(surface: Surface, order: number) {
   const anchor = surface === 'output' ? 'output_scan' : 'input_detection'
   const baseX = (STAGE_X[anchor] ?? 0) - 18
   if (surface === 'output') {
@@ -61,13 +77,13 @@ export function defaultRulePosition(surface, order) {
   return { x: baseX + col * RULE_COL_W, y: RULE_TOP + row * RULE_STEP }
 }
 
-const slug = (s) =>
+const slug = (s: string): string =>
   String(s || 'rule')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '') || 'rule'
 
-export function uniqueId(base, existing) {
+export function uniqueId(base: string, existing: Iterable<string>): string {
   const taken = new Set(existing)
   let id = slug(base)
   let n = 2
@@ -75,7 +91,7 @@ export function uniqueId(base, existing) {
   return id
 }
 
-export function blankRule(existingIds) {
+export function blankRule(existingIds: string[]): Rule {
   return {
     id: uniqueId('new_rule', existingIds),
     name: 'New rule',
@@ -91,10 +107,11 @@ export function blankRule(existingIds) {
   }
 }
 
-const quote = (s) => '"' + String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+const quote = (s: string): string =>
+  '"' + String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
 
 // Serialize the editable rule list back into the pack's YAML shape.
-export function rulesToYaml(rules) {
+export function rulesToYaml(rules: Rule[]): string {
   let out = 'version: 1\nrules:\n'
   for (const r of rules) {
     out += `- id: ${quote(r.id)}\n`
