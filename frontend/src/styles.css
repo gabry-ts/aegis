@@ -4357,3 +4357,165 @@ input[type='text']:focus-visible {
   display: flex;
   gap: 8px;
 }
+
+/* ---- rule library drawer ------------------------------------------------- */
+.rlib {
+  width: 312px;
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklab, var(--surface-2) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+  z-index: 5;
+  overflow: hidden;
+  animation: drawerin 0.26s var(--ease-out) both;
+}
+.rlib__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.rlib__title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+.rlib__close {
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+}
+.rlib__close:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+.rlib__search {
+  margin: 10px 12px 4px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+}
+.rlib__search:focus {
+  outline: 2px solid var(--iris);
+  outline-offset: 0;
+}
+.rlib__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px 12px;
+}
+.rlib__group {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  padding: 12px 4px 6px;
+}
+.rlib__empty {
+  color: var(--faint);
+  font-size: 0.72rem;
+  padding: 2px 4px 6px;
+}
+.rlib__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rlib-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.rlib-row:hover {
+  border-color: var(--line-2);
+}
+.rlib-row.is-sel {
+  border-color: var(--iris-line);
+  background: var(--iris-fill);
+}
+.rlib-row.is-off {
+  opacity: 0.62;
+}
+.rlib-row__main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rlib-row__top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.rlib-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rlib-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px -1px var(--green);
+}
+.rlib-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.66rem;
+  color: var(--faint);
+}
+.rlib-act {
+  flex-shrink: 0;
+  width: 34px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.rlib-act--add:hover {
+  color: var(--iris-ink);
+  background: var(--iris-fill);
+}
+.rlib-act--remove:hover {
+  color: var(--red);
+  background: var(--red-fill);
+}
