@@ -2,12 +2,20 @@
 // "All endpoints" choice (value null) for the aggregate dashboard / audit view;
 // without it the caller always works against a single flow.
 
+import type { Endpoint } from '../types'
+
 export default function EndpointSwitcher({
   endpoints = [],
   value = null,
   onChange,
   allowAll = false,
   label = 'Endpoint',
+}: {
+  endpoints?: Endpoint[]
+  value?: string | null
+  onChange: (slug: string | null) => void
+  allowAll?: boolean
+  label?: string
 }) {
   return (
     <label className="ep-switcher">
