@@ -63,6 +63,25 @@ npm install
 npm run dev                   # http://localhost:5173 (proxies /api and /v1 to :8000)
 ```
 
+## Docker
+
+Build and run the whole stack with one command:
+
+```bash
+docker compose up --build      # frontend on http://localhost:8080
+```
+
+The frontend (nginx) is the only exposed port and reverse-proxies `/api`, `/v1`
+and `/health` to the backend over the internal network. The audit sqlite lives in
+the `aegis-data` volume. To use a real model, set `AEGIS_MODE=regolo` and the
+Regolo variables on the `backend` service.
+
+Every push to `main` builds and publishes both images to GHCR, each tagged
+`latest` and `sha-<commit>`:
+
+- `ghcr.io/gabry-ts/aegis-backend`
+- `ghcr.io/gabry-ts/aegis-frontend`
+
 ## The console
 
 The frontend is an operations console with five surfaces:
