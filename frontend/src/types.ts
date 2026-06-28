@@ -160,6 +160,8 @@ export interface Endpoint {
   rules: string[]
   rule_count: number
   judge: boolean
+  /** Rule ids placed on this endpoint's board; null means the whole library. */
+  board: string[] | null
   upstream: EndpointUpstream
 }
 
@@ -180,6 +182,7 @@ export interface EndpointCreateBody {
   description?: string
   rules?: string[]
   judge?: boolean
+  board?: string[] | null
   upstream?: UpstreamInput
 }
 
