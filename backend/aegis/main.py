@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
@@ -186,7 +186,7 @@ def _endpoint_404(slug: str) -> JSONResponse:
 
 
 @app.post("/v1/{slug}/chat/completions", dependencies=[Depends(security.guard)])
-def chat_completions(slug: str, req: schemas.ChatRequest):
+def chat_completions(slug: str, req: schemas.ChatRequest, request: Request):
     metrics.inc("aegis_requests_total")
     ep = endpoints.get(slug)
     if ep is None:
@@ -223,7 +223,8 @@ def chat_completions(slug: str, req: schemas.ChatRequest):
     else:
         metrics.inc("aegis_allowed_total")
 
-    content = transparency.inject(content)
+    lang = transparency.resolve_lang(request.headers.get("accept-language"))
+    content = transparency.inject(content, lang)
     _record(clog.make_event(schemas.transparency_event(content), actor="api", endpoint=slug))
 
     if req.stream:
@@ -237,7 +238,7 @@ def chat_completions(slug: str, req: schemas.ChatRequest):
 # ---- Playground (friendly, full-trace) ----------------------------------
 
 @app.post("/api/chat")
-def api_chat(req: schemas.PlaygroundRequest):
+def api_chat(req: schemas.PlaygroundRequest, request: Request):
     metrics.inc("aegis_requests_total")
     events = []
 
@@ -287,7 +288,8 @@ def api_chat(req: schemas.PlaygroundRequest):
     else:
         metrics.inc("aegis_allowed_total")
 
-    reply = transparency.inject(reply)
+    lang = transparency.resolve_lang(request.headers.get("accept-language"))
+    reply = transparency.inject(reply, lang)
     events.append(_record(clog.make_event(schemas.transparency_event(reply), actor="playground", endpoint=slug)))
 
     return {

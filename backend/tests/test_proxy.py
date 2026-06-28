@@ -127,3 +127,18 @@ def test_audit_assistant_context_carries_no_pii(monkeypatch):
     context = captured["system"]
     assert email not in context
     assert config.AEGIS_SECRET not in context
+
+
+def test_disclosure_respects_accept_language():
+    from aegis import transparency
+
+    resp = client.post(
+        "/api/chat",
+        json={"text": "hello there", "guard": True, "slug": "default"},
+        headers={"Accept-Language": "it-IT,it;q=0.9,en;q=0.8"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["blocked"] is False
+    assert transparency.DISCLOSURES["it"] in body["reply"]
+    assert body["reply"].count(transparency.MARKER) == 1

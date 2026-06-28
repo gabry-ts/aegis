@@ -37,6 +37,15 @@ QUESTIONS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "procedural",
+        "label": "If in a high-risk domain, does it only perform a narrow procedural or "
+                 "preparatory task, without profiling or influencing decisions on people? (Art. 6(3))",
+        "options": [
+            {"value": "no", "label": "No — it informs or decides about people"},
+            {"value": "yes", "label": "Yes — narrow procedural / preparatory only"},
+        ],
+    },
+    {
         "id": "interacts",
         "label": "Does it interact with people or generate content (text/image/audio/video)?",
         "options": [
@@ -50,6 +59,15 @@ QUESTIONS: List[Dict[str, Any]] = [
         "options": [
             {"value": "no", "label": "No"},
             {"value": "yes", "label": "Yes"},
+        ],
+    },
+    {
+        "id": "systemic",
+        "label": "If a GPAI provider, does the model pose systemic risk (high-impact "
+                 "capabilities, e.g. trained above ~10^25 FLOPs or designated)? (Art. 51)",
+        "options": [
+            {"value": "no", "label": "No"},
+            {"value": "yes", "label": "Yes — systemic risk"},
         ],
     },
 ]
@@ -72,17 +90,29 @@ _HIGH_RISK_OBLIGATIONS = [
     {"article": "Art. 15", "label": "Accuracy, robustness & cybersecurity", "aegis": "yes"},
 ]
 
-_GPAI_OBLIGATIONS = [
+# Every GPAI provider carries the Art. 53 baseline; the Art. 55 systemic-risk
+# duties attach only once the model crosses the Art. 51 threshold.
+_GPAI_BASE_OBLIGATIONS = [
     {"article": "Art. 53", "label": "GPAI: technical documentation & training-data summary", "aegis": "no"},
+]
+_GPAI_SYSTEMIC_OBLIGATIONS = [
     {"article": "Art. 55", "label": "GPAI with systemic risk: evaluation & incident reporting", "aegis": "partial"},
 ]
 
 
 def classify(answers: Dict[str, str]) -> Dict[str, Any]:
     prohibited = answers.get("prohibited", "none") != "none"
-    high_risk = answers.get("domain", "none") != "none"
+    in_annex_iii = answers.get("domain", "none") != "none"
+    procedural = answers.get("procedural") == "yes"
     interacts = answers.get("interacts") == "yes"
     gpai = answers.get("gpai") == "yes"
+    systemic = answers.get("systemic") == "yes"
+
+    # Art. 6(3): a system in an Annex III area is NOT high-risk when it only
+    # performs a narrow procedural / preparatory task. The carve-out never lifts
+    # an Article 5 prohibition.
+    high_risk = in_annex_iii and not procedural
+    carved_out = in_annex_iii and procedural
 
     if prohibited:
         tier = "prohibited"
@@ -95,18 +125,29 @@ def classify(answers: Dict[str, str]) -> Dict[str, Any]:
         rationale = "Operating in an Annex III domain makes this a high-risk system, triggering the full Chapter III obligations."
         obligations = list(_HIGH_RISK_OBLIGATIONS)
         if interacts:
-            obligations.append({"article": "Art. 50", "label": "Transparency (AI disclosure)", "aegis": "yes"})
+            obligations.append({"article": "Art. 50", "label": "Transparency (AI disclosure)", "aegis": "partial"})
     elif interacts:
         tier = "limited"
-        rationale = "It interacts with people or generates content, so the Article 50 transparency obligations apply."
-        obligations = [{"article": "Art. 50", "label": "Transparency (AI disclosure)", "aegis": "yes"}]
+        if carved_out:
+            rationale = ("In an Annex III domain but limited to a narrow procedural / preparatory task, "
+                         "so the Article 6(3) exception applies and it is not high-risk. Article 50 "
+                         "transparency still applies because it interacts with people or generates content.")
+        else:
+            rationale = "It interacts with people or generates content, so the Article 50 transparency obligations apply."
+        obligations = [{"article": "Art. 50", "label": "Transparency (AI disclosure)", "aegis": "partial"}]
     else:
         tier = "minimal"
-        rationale = "No mandatory obligations under the Act; adherence to voluntary codes of conduct is encouraged."
+        if carved_out:
+            rationale = ("In an Annex III domain but limited to a narrow procedural / preparatory task, "
+                         "so the Article 6(3) exception applies: not high-risk, no mandatory obligations.")
+        else:
+            rationale = "No mandatory obligations under the Act; adherence to voluntary codes of conduct is encouraged."
         obligations = [{"article": "—", "label": "Voluntary codes of conduct", "aegis": "na"}]
 
     if gpai:
-        obligations = obligations + list(_GPAI_OBLIGATIONS)
+        obligations = obligations + list(_GPAI_BASE_OBLIGATIONS)
+        if systemic:
+            obligations = obligations + list(_GPAI_SYSTEMIC_OBLIGATIONS)
 
     covered = sum(1 for o in obligations if o["aegis"] == "yes")
     addressable = sum(1 for o in obligations if o["aegis"] in ("yes", "partial"))

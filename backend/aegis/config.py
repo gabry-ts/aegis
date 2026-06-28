@@ -33,6 +33,9 @@ BLOCK_THRESHOLD = int(os.getenv("BLOCK_THRESHOLD", "3"))
 JUDGE_ENABLED = _flag("JUDGE_ENABLED", True)
 # When the inspection pipeline errors, block instead of letting traffic through.
 FAIL_CLOSED = _flag("AEGIS_FAIL_CLOSED", False)
+# Default language for the Art. 50 AI disclosure (overridable per request via the
+# Accept-Language header). Falls back to English for any unsupported code.
+DISCLOSURE_LANG = os.getenv("AEGIS_DISCLOSURE_LANG", "en").strip().lower()
 
 # ---- persistence / eventing --------------------------------------------
 DB_PATH = os.getenv("DB_PATH", "aegis.db")
