@@ -104,6 +104,11 @@ def _validate(data):
         rules = raw.get("rules") or []
         if not isinstance(rules, list) or not all(isinstance(r, str) for r in rules):
             return None, f"endpoint '{slug}': rules must be a list of rule ids"
+        board = raw.get("board")
+        if board is not None and (
+            not isinstance(board, list) or not all(isinstance(r, str) for r in board)
+        ):
+            return None, f"endpoint '{slug}': board must be a list of rule ids"
         out.append(
             {
                 "slug": slug,
@@ -112,6 +117,7 @@ def _validate(data):
                 "rules": list(rules),
                 "judge": bool(raw.get("judge", False)),
                 "upstream": _norm_upstream(raw.get("upstream")),
+                "board": list(board) if isinstance(board, list) else None,
             }
         )
     return out, None
@@ -154,6 +160,8 @@ def _public(ep):
         "rules": list(ep.get("rules", [])),
         "rule_count": len(ep.get("rules", [])),
         "judge": bool(ep.get("judge", False)),
+        # Rule ids on this endpoint's board; None means the whole library.
+        "board": list(ep["board"]) if isinstance(ep.get("board"), list) else None,
         "upstream": {
             "base_url": up.get("base_url"),
             "model": up.get("model"),
@@ -183,7 +191,7 @@ def active_ids(slug):
     return set(ep["rules"]) if ep else None
 
 
-def create(name, slug=None, description="", rules=None, judge=False, upstream=None):
+def create(name, slug=None, description="", rules=None, judge=False, upstream=None, board=None):
     slug = (slug or _slugify(name)).strip().lower()
     if not _SLUG_RE.match(slug):
         return {"ok": False, "error": "invalid slug (a-z, 0-9, hyphen; 1..40 chars)"}
@@ -198,13 +206,14 @@ def create(name, slug=None, description="", rules=None, judge=False, upstream=No
             "rules": [r for r in (rules or []) if r in known],
             "judge": bool(judge),
             "upstream": _norm_upstream(upstream),
+            "board": [r for r in board if r in known] if board is not None else None,
         }
         _registry["endpoints"].append(ep)
         _write(_registry["endpoints"])
     return {"ok": True, "endpoint": _public(ep)}
 
 
-def update(slug, name=None, description=None, rules=None, judge=None, upstream=None):
+def update(slug, name=None, description=None, rules=None, judge=None, upstream=None, board=None):
     with _lock:
         for ep in _registry["endpoints"]:
             if ep["slug"] == slug:
@@ -219,6 +228,9 @@ def update(slug, name=None, description=None, rules=None, judge=None, upstream=N
                     ep["judge"] = bool(judge)
                 if upstream is not None:
                     ep["upstream"] = _norm_upstream(upstream)
+                if board is not None:
+                    known = set(_all_rule_ids())
+                    ep["board"] = [r for r in board if r in known]
                 _write(_registry["endpoints"])
                 return {"ok": True, "endpoint": _public(ep)}
     return {"ok": False, "error": "endpoint not found"}

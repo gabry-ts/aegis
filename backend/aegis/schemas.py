@@ -195,6 +195,8 @@ class EndpointCreate(BaseModel):
     rules: List[str] = []
     judge: bool = False
     upstream: Optional[Upstream] = None
+    # Rule ids placed on this endpoint's board. None means "the whole library".
+    board: Optional[List[str]] = None
 
 
 class EndpointUpdate(BaseModel):
@@ -203,6 +205,7 @@ class EndpointUpdate(BaseModel):
     rules: Optional[List[str]] = None
     judge: Optional[bool] = None
     upstream: Optional[Upstream] = None
+    board: Optional[List[str]] = None
 
 
 class AssessRequest(BaseModel):

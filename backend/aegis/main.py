@@ -459,6 +459,7 @@ def api_endpoints_create(req: schemas.EndpointCreate):
         name=req.name, slug=req.slug, description=req.description,
         rules=req.rules, judge=req.judge,
         upstream=req.upstream.model_dump() if req.upstream else None,
+        board=req.board,
     )
 
 
@@ -467,6 +468,7 @@ def api_endpoints_update(slug: str, req: schemas.EndpointUpdate):
     return endpoints.update(
         slug, name=req.name, description=req.description, rules=req.rules, judge=req.judge,
         upstream=req.upstream.model_dump() if req.upstream else None,
+        board=req.board,
     )
 
 
