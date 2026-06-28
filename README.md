@@ -5,13 +5,14 @@
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![Node](https://img.shields.io/badge/node-20+-green.svg)
 
-A guardrail proxy for LLM applications that doubles as an **EU AI Act compliance layer**.
+AEGIS is a guardrail proxy for LLM applications. It also works as an EU AI Act
+compliance layer.
 
-AEGIS sits in front of any OpenAI-compatible LLM. It inspects every request and
-response, blocks prompt injection / jailbreaks / data exfiltration, sanitizes
-leaked PII and secrets, injects the AI-disclosure required by the Act, and writes
-a tamper-evident audit trail. The same event is both a **security signal** and a
-**piece of compliance evidence**.
+It sits in front of any OpenAI-compatible LLM and inspects every request and
+response. It blocks prompt injection, jailbreaks and data exfiltration, strips
+leaked PII and secrets, adds the AI disclosure the Act requires, and writes a
+tamper-evident audit trail. Every event is both a security signal and a piece of
+compliance evidence.
 
 ```
   Your LLM app  ──▶  AEGIS proxy  ──▶  Regolo AI (or any OpenAI-compatible model)
@@ -20,9 +21,9 @@ a tamper-evident audit trail. The same event is both a **security signal** and a
                       │  Transparency layer (Art. 50)
 ```
 
-It runs **fully offline by default** — a deterministic mock model, sqlite audit
-and an in-memory bus — so you can clone and explore the whole thing without any
-API key.
+By default it runs fully offline: a deterministic mock model, a sqlite audit log
+and an in-memory bus. You can clone the repo and explore all of it without an API
+key.
 
 ## EU AI Act mapping
 
@@ -33,14 +34,14 @@ API key.
 | Art. 50    | Disclose AI-generated content                                         | Transparency injector + `X-AI-Generated` header     |
 
 > Scope note: Art. 15 applies to high-risk systems (Annex III) and to GPAI used
-> in those domains. AEGIS is positioned as the control layer that makes a
-> high-risk deployment compliant, not as a blanket obligation for every chatbot.
+> in those domains. AEGIS is the control layer that makes a high-risk deployment
+> compliant; it is not a blanket obligation for every chatbot.
 
 ## Quick start
 
 ### Backend (FastAPI, Python 3.12+)
 
-Runs fully offline in **mock mode** by default — no API key required.
+By default the backend runs fully offline in mock mode, so no API key is needed.
 
 ```bash
 cd backend
@@ -64,33 +65,32 @@ npm run dev                   # http://localhost:5173 (proxies /api and /v1 to :
 
 ## The console
 
-The frontend is a five-surface operations console:
+The frontend is an operations console with five surfaces:
 
-- **Dashboard** — live threat feed, compliance ledger, severity distribution and
-  an AI Act coverage ring, streamed from the backend over SSE.
-- **Playground** — an attack console with a guard toggle and the **LiveFire**
-  cinematic pipeline: pick the endpoint to attack, turn protection off to see the
-  unprotected model leak its planted secret, and on to watch that flow block the
-  attack and seal the evidence.
-- **Guardrail** — the selected endpoint's rules as a drag-arrange board (React
-  Flow). Arm/disarm a rule for that flow, edit the shared definition, or open the
-  **Library** drawer to add rules to / remove them from the board.
-- **Compliance · Audit** — the hash-chained audit log with one-click integrity
+- **Dashboard**: live threat feed, compliance ledger, severity distribution and an
+  AI Act coverage ring, all streamed from the backend over SSE.
+- **Playground**: an attack console with a guard toggle and the LiveFire demo.
+  Pick an endpoint to attack, turn protection off to watch the model leak its
+  planted secret, then turn it on to see the same request blocked and logged.
+- **Guardrail**: the selected endpoint's rules as a drag-arrange board (React
+  Flow). Arm or disarm a rule for that flow, edit the shared definition, or open
+  the Library drawer to add and remove rules on the board.
+- **Compliance · Audit**: the hash-chained audit log, with one-click integrity
   verification and a tamper simulation.
-- **Compliance · AI Act** — a self-assessment that classifies a deployment into
-  the Act's risk tiers and lists which obligations AEGIS already helps satisfy.
+- **Compliance · AI Act**: a self-assessment that sorts a deployment into the
+  Act's risk tiers and lists the obligations AEGIS already helps satisfy.
 
 ## Endpoints (named guardrail flows)
 
-Each endpoint is a named guardrail **flow** that selects which rules from the
-shared library are armed, whether the LLM judge runs, and **where passing
-requests are forwarded** (its own `base_url` + `model`). The proxy is reached
-per-flow at `/v1/{slug}/chat/completions`, and the read endpoints accept an
-optional `?endpoint=<slug>` filter (omit it for the aggregate, all-endpoints view).
+Each endpoint is a named guardrail flow. It selects which rules from the shared
+library are armed, whether the LLM judge runs, and where passing requests go (its
+own `base_url` and `model`). You reach the proxy per flow at
+`/v1/{slug}/chat/completions`, and the read endpoints take an optional
+`?endpoint=<slug>` filter (omit it for the aggregate view across all endpoints).
 
-An endpoint's upstream credential is referenced by the **name** of an environment
-variable (`api_key_env`, restricted to an allowlist — see Security), never stored
-as a raw secret. With no upstream configured, an endpoint falls back to the
+An endpoint refers to its upstream credential by the name of an environment
+variable (`api_key_env`, limited to an allowlist; see Security), never by storing
+the raw secret. If no upstream is configured, the endpoint falls back to the
 global provider (Regolo, or the offline mock).
 
 ```bash
@@ -101,9 +101,10 @@ curl http://localhost:8000/v1/default/chat/completions \
 
 ## Security & hardening
 
-AEGIS ships **open by default** so it works zero-config on a trusted / isolated
-network. Before exposing it further, set the hardened paths (full reference in
-[`backend/.env.example`](backend/.env.example) and [SECURITY.md](SECURITY.md)):
+AEGIS ships open by default, so it works with zero configuration on a trusted or
+isolated network. Before exposing it more widely, set the hardened options (full
+reference in [`backend/.env.example`](backend/.env.example) and
+[SECURITY.md](SECURITY.md)):
 
 | Variable                      | Purpose                                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------------------------- |
@@ -112,13 +113,13 @@ network. Before exposing it further, set the hardened paths (full reference in
 | `AEGIS_RATE_LIMIT_RPM`        | Per-principal rate limit on `/v1`.                                                        |
 | `AEGIS_CORS_ORIGINS`          | Allowed browser origins (defaults to `http://localhost:5173`).                           |
 | `AEGIS_UPSTREAM_KEY_ENVS`     | Allowlist of env-var names an endpoint may use for its upstream key (anti-exfiltration).  |
-| `AEGIS_ALLOW_PRIVATE_UPSTREAM`| Allow forwarding to private/loopback hosts (off by default — the SSRF guard).             |
+| `AEGIS_ALLOW_PRIVATE_UPSTREAM`| Allow forwarding to private/loopback hosts (off by default, the SSRF guard).              |
 | `AEGIS_FAIL_CLOSED`           | Block traffic when the inspection pipeline errors.                                        |
 
-The upstream forwarder validates `base_url` and only resolves credential env vars
-from the allowlist, so a crafted endpoint cannot drive SSRF or exfiltrate
-arbitrary process environment variables. Please report vulnerabilities privately
-per [SECURITY.md](SECURITY.md).
+The upstream forwarder validates `base_url` and resolves credential env vars only
+from the allowlist, so a crafted endpoint cannot drive SSRF or read arbitrary
+process environment variables. Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
 
 ## Project layout
 
@@ -147,9 +148,9 @@ frontend/
 
 ## API
 
-A representative subset — the full, always-current contract is at
-`http://localhost:8000/docs` (OpenAPI). Routes marked **admin** require
-`X-API-Key` when `AEGIS_ADMIN_API_KEY` is set.
+A representative subset. The full, always-current contract lives at
+`http://localhost:8000/docs` (OpenAPI). Routes marked **admin** need `X-API-Key`
+when `AEGIS_ADMIN_API_KEY` is set.
 
 | Method | Path                              | Purpose                                              |
 | ------ | --------------------------------- | ---------------------------------------------------- |
@@ -181,11 +182,11 @@ cd frontend && npm run typecheck && npm run build
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions and how to add a
-detection rule. CI runs the backend tests and the frontend type-check + build on
-every pull request.
+detection rule. CI runs the backend tests and the frontend type-check and build
+on every pull request.
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for
+Licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE) for
 third-party attributions (the frontend's GSAP animation library keeps its own
 GreenSock license).
