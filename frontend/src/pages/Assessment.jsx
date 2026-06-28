@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { assess, getAssessQuestions } from '../api.js'
-import { toast } from '../toast.js'
+import { assess, getAssessQuestions } from '../api'
+import { toast } from '../toast'
 
 const TIER_COLOR = { prohibited: 'red', high_risk: 'amber', limited: 'blue', minimal: 'green' }
 const AEGIS_LABEL = { yes: 'AEGIS ✓', partial: 'AEGIS partial', no: 'out of scope', na: '—' }

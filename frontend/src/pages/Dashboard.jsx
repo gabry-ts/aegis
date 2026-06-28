@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Panel, Skeleton } from '../components/primitives.jsx'
-import StatusBar from '../components/StatusBar.jsx'
-import ThreatFeed from '../components/ThreatFeed.jsx'
-import ComplianceLedger from '../components/ComplianceLedger.jsx'
-import SeverityChart from '../components/SeverityChart.jsx'
-import ComplianceCoverage from '../components/ComplianceCoverage.jsx'
-import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
-import { useEndpoints } from '../context/EndpointsContext.jsx'
-import { streamUrl } from '../api.js'
+import { Panel, Skeleton } from '../components/primitives'
+import StatusBar from '../components/StatusBar'
+import ThreatFeed from '../components/ThreatFeed'
+import ComplianceLedger from '../components/ComplianceLedger'
+import SeverityChart from '../components/SeverityChart'
+import ComplianceCoverage from '../components/ComplianceCoverage'
+import EndpointSwitcher from '../components/EndpointSwitcher'
+import { useEndpoints } from '../context/EndpointsContext'
+import { streamUrl } from '../api'
 
 export default function Dashboard() {
   const { endpoints } = useEndpoints()

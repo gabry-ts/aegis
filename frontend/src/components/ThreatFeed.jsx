@@ -1,4 +1,4 @@
-import { ArtChip, EmptyState, Sev, VerdictBadge, ActionBadge, fmtTime } from './primitives.jsx'
+import { ArtChip, EmptyState, Sev, VerdictBadge, ActionBadge, fmtTime } from './primitives'
 
 export default function ThreatFeed({ events }) {
   const threats = events.filter((e) => e.verdict !== 'SAFE').slice(-40).reverse()

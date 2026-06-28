@@ -12,10 +12,10 @@ import {
   useNodesState,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { nodeTypes } from './RuleNodes.jsx'
-import { edgeTypes } from './FlowEdge.jsx'
-import { STAGES, stagePosition, judgePosition, defaultRulePosition, ACTION_COLOR } from './rulesYaml.js'
-import { toast } from '../../toast.js'
+import { nodeTypes } from './RuleNodes'
+import { edgeTypes } from './FlowEdge'
+import { STAGES, stagePosition, judgePosition, defaultRulePosition, ACTION_COLOR } from './rulesYaml'
+import { toast } from '../../toast'
 
 const POS_KEY = 'aegis.rules.positions.v1'
 

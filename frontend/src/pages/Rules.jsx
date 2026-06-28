@@ -6,14 +6,14 @@ import {
   updateEndpoint,
   createEndpoint,
   deleteEndpoint,
-} from '../api.js'
-import { useEndpoints } from '../context/EndpointsContext.jsx'
-import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
-import RuleCanvas from '../components/rules/RuleCanvas.jsx'
-import RuleList from '../components/rules/RuleList.jsx'
-import RuleInspector from '../components/rules/RuleInspector.jsx'
-import { blankRule, rulesToYaml } from '../components/rules/rulesYaml.js'
-import { toast } from '../toast.js'
+} from '../api'
+import { useEndpoints } from '../context/EndpointsContext'
+import EndpointSwitcher from '../components/EndpointSwitcher'
+import RuleCanvas from '../components/rules/RuleCanvas'
+import RuleList from '../components/rules/RuleList'
+import RuleInspector from '../components/rules/RuleInspector'
+import { blankRule, rulesToYaml } from '../components/rules/rulesYaml'
+import { toast } from '../toast'
 
 function useNarrow() {
   const [narrow, setNarrow] = useState(

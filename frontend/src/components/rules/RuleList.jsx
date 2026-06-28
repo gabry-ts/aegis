@@ -2,7 +2,7 @@
 // as a plain keyboard- and touch-operable list (the React Flow canvas is
 // pointer-and-zoom only, unusable on a phone or by keyboard).
 
-import { ACTION_COLOR } from './rulesYaml.js'
+import { ACTION_COLOR } from './rulesYaml'
 
 export default function RuleList({ rules, hitIds, selectedId, onToggle, onSelect }) {
   return (

@@ -1,7 +1,7 @@
 // Right-hand editor for the selected detector node. Every change is pushed up
 // as a patch; the parent owns the rule list and the dirty flag.
 
-import { SURFACES, ACTIONS, DETECTORS, VERDICTS } from './rulesYaml.js'
+import { SURFACES, ACTIONS, DETECTORS, VERDICTS } from './rulesYaml'
 
 function Field({ label, children, hint }) {
   return (

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { getStats } from './api.js'
-import Dashboard from './pages/Dashboard.jsx'
-import Integrity from './pages/Integrity.jsx'
-import Playground from './pages/Playground.jsx'
-import Assessment from './pages/Assessment.jsx'
-import Rules from './pages/Rules.jsx'
-import Toaster from './components/Toaster.jsx'
-import Assistant from './components/Assistant.jsx'
+import { getStats } from './api'
+import Dashboard from './pages/Dashboard'
+import Integrity from './pages/Integrity'
+import Playground from './pages/Playground'
+import Assessment from './pages/Assessment'
+import Rules from './pages/Rules'
+import Toaster from './components/Toaster'
+import Assistant from './components/Assistant'
 
 const SECTIONS = [
   { label: 'Dashboard', caption: 'live activity', base: '/', paths: ['/'], subs: [] },

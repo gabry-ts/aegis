@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActionBadge, ArtChip, fmtTime } from './primitives.jsx'
+import { ActionBadge, ArtChip, fmtTime } from './primitives'
 
 const short = (h) => (h ? h.slice(0, 12) : '—')
 const FILTERS = ['all', 'BLOCKED', 'SANITIZED', 'ALLOWED', 'LOGGED']

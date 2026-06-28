@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { chat } from '../api.js'
-import LiveFire from './LiveFire.jsx'
+import { chat } from '../api'
+import LiveFire from './LiveFire'
 
 const KIND_COLOR = {
   PROMPT_INJECTION: 'amber',

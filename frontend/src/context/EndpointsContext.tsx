@@ -4,7 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { getEndpoints } from '../api.js'
+import { getEndpoints } from '../api'
 import type { Endpoint, EndpointsContextValue } from '../types'
 
 const KEY = 'aegis.endpoint.current'

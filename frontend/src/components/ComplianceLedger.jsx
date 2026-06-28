@@ -1,6 +1,6 @@
-import { ActionBadge, ArtChip, fmtTime } from './primitives.jsx'
-import { exportUrl } from '../api.js'
-import { toast } from '../toast.js'
+import { ActionBadge, ArtChip, fmtTime } from './primitives'
+import { exportUrl } from '../api'
+import { toast } from '../toast'
 
 export default function ComplianceLedger({ events }) {
   const rows = [...events].slice(-60).reverse()

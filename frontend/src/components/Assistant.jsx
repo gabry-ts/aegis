@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { auditChat } from '../api.js'
+import { auditChat } from '../api'
 
 const SUGGESTIONS = [
   'How many attacks did we block?',

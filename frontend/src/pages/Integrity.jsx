@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { demoReset, demoTamper, getAudit, verify as apiVerify } from '../api.js'
-import HashChain from '../components/HashChain.jsx'
-import EndpointSwitcher from '../components/EndpointSwitcher.jsx'
-import { useEndpoints } from '../context/EndpointsContext.jsx'
-import { toast } from '../toast.js'
+import { demoReset, demoTamper, getAudit, verify as apiVerify } from '../api'
+import HashChain from '../components/HashChain'
+import EndpointSwitcher from '../components/EndpointSwitcher'
+import { useEndpoints } from '../context/EndpointsContext'
+import { toast } from '../toast'
 
 export default function Integrity() {
   const { endpoints } = useEndpoints()

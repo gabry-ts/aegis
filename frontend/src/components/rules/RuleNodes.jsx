@@ -2,8 +2,8 @@
 // draggable detector blocks that hang off them (RuleNode).
 
 import { Handle, Position } from '@xyflow/react'
-import { Sev, ArtChip } from '../primitives.jsx'
-import { ACTION_COLOR } from './rulesYaml.js'
+import { Sev, ArtChip } from '../primitives'
+import { ACTION_COLOR } from './rulesYaml'
 
 const STAGE_ICON = {
   prompt: <path d="M5 6l4 4-4 4M11 15h5" />,
