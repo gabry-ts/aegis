@@ -106,8 +106,8 @@ function buildEdges(
   for (let i = 0; i < STAGES.length - 1; i++) {
     edges.push({
       id: `spine:${i}`,
-      source: `stage:${STAGES[i].id}`,
-      target: `stage:${STAGES[i + 1].id}`,
+      source: `stage:${STAGES[i]!.id}`,
+      target: `stage:${STAGES[i + 1]!.id}`,
       sourceHandle: 'r',
       targetHandle: 'l',
       type: 'flow',

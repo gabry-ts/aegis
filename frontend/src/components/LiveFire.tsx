@@ -59,7 +59,7 @@ const STAGES: LfStage[] = [
   { key: 'disclosure', title: 'Disclosure', sub: 'AI label', art: 'Art.50', icon: ICON.info },
   { key: 'audit', title: 'Audit · Seal', sub: 'hash chain', art: 'Art.12', icon: ICON.lock },
 ]
-const IDX = Object.fromEntries(STAGES.map((s, i) => [s.key, i]))
+const IDX = Object.fromEntries(STAGES.map((s, i) => [s.key, i])) as Record<StageKey, number>
 
 // leak signatures, only used to highlight what genuinely surfaced in a reply.
 // the dash class covers the unicode hyphens (‑ – —) models often emit.

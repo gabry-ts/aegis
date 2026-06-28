@@ -87,7 +87,7 @@ export default function AttackConsole({
         await sleep(400)
         continue
       }
-      const a = list[i % list.length]
+      const a = list[i % list.length]!
       const myId = (runIdRef.current += 1)
       setPlayInfo({ i: (i % list.length) + 1, total: list.length, label: a.label })
       setText(a.text)

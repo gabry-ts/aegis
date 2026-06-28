@@ -45,7 +45,7 @@ const SECTIONS: Section[] = [
 ]
 
 function activeSection(pathname: string): Section {
-  return SECTIONS.find((s) => s.paths.includes(pathname)) || SECTIONS[0]
+  return SECTIONS.find((s) => s.paths.includes(pathname)) || SECTIONS[0]!
 }
 
 function SubNav() {

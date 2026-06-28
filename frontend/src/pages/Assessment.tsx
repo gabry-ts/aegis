@@ -29,7 +29,7 @@ export default function Assessment() {
         setQuestions(qs)
         const init: Record<string, string> = {}
         qs.forEach((q) => {
-          init[q.id] = q.options[0]?.value
+          init[q.id] = q.options[0]?.value ?? ''
         })
         setAnswers(init)
       })
