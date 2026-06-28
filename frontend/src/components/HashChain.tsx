@@ -1,15 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActionBadge, ArtChip, fmtTime } from './primitives'
+import type { ActionKind, AuditEvent } from '../types'
 
-const short = (h) => (h ? h.slice(0, 12) : '—')
-const FILTERS = ['all', 'BLOCKED', 'SANITIZED', 'ALLOWED', 'LOGGED']
-const SEAL_LABEL = { tampered: 'tampered', invalid: 'invalidated', verified: 'verified', sealed: 'sealed' }
+type SealStatus = 'tampered' | 'invalid' | 'verified' | 'sealed'
+type FilterKind = 'all' | ActionKind
+
+const short = (h?: string) => (h ? h.slice(0, 12) : '—')
+const FILTERS: FilterKind[] = ['all', 'BLOCKED', 'SANITIZED', 'ALLOWED', 'LOGGED']
+const SEAL_LABEL: Record<SealStatus, string> = {
+  tampered: 'tampered',
+  invalid: 'invalidated',
+  verified: 'verified',
+  sealed: 'sealed',
+}
 const PAGE = 10
 
-export default function HashChain({ events, phase, brokenAt, endpoint = null }) {
-  const [filter, setFilter] = useState('all')
+export default function HashChain({
+  events,
+  phase,
+  brokenAt,
+  endpoint = null,
+}: {
+  events: AuditEvent[]
+  phase: 'idle' | 'verifying' | 'verified' | 'broken'
+  brokenAt: number | null
+  endpoint?: string | null
+}) {
+  const [filter, setFilter] = useState<FilterKind>('all')
   const [page, setPage] = useState(0)
-  const brokenRef = useRef(null)
+  const brokenRef = useRef<HTMLTableRowElement | null>(null)
 
   // Scope the listed records to an endpoint when asked; the chain itself stays
   // global, so integrity is always verified across every record.
@@ -23,7 +42,7 @@ export default function HashChain({ events, phase, brokenAt, endpoint = null }) 
   const start = cur * PAGE
   const pageRows = rows.slice(start, start + PAGE)
 
-  const statusOf = (e) => {
+  const statusOf = (e: AuditEvent): SealStatus => {
     if (phase === 'broken' && brokenAt != null) {
       if (e.id === brokenAt) return 'tampered'
       if (e.id > brokenAt) return 'invalid' // sealed after the break — no longer matches
@@ -33,7 +52,7 @@ export default function HashChain({ events, phase, brokenAt, endpoint = null }) 
     return 'sealed'
   }
 
-  const pickFilter = (f) => {
+  const pickFilter = (f: FilterKind) => {
     setFilter(f)
     setPage(0)
   }
@@ -120,7 +139,7 @@ export default function HashChain({ events, phase, brokenAt, endpoint = null }) 
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="8" className="audit-empty c-muted">
+                <td colSpan={8} className="audit-empty c-muted">
                   No {filter.toLowerCase()} records.
                 </td>
               </tr>
