@@ -46,3 +46,12 @@ boundary, enable the hardened paths:
 
 Never commit real secrets: `.env` is gitignored and only env-var *names* are
 ever stored in the endpoint registry.
+
+## Data protection
+
+AEGIS processes prompt and response excerpts as audit evidence. Audit events are
+redacted at rest, no client IP is persisted, and retention is bounded by
+`AEGIS_AUDIT_RETENTION_DAYS`. See [PRIVACY.md](PRIVACY.md) for the GDPR data
+flows, roles, transfers and data subject rights, and
+[docs/DPA-template.md](docs/DPA-template.md) for a controller-to-processor
+agreement template.
