@@ -39,8 +39,9 @@ key.
 > compliant; it is not a blanket obligation for every chatbot.
 >
 > PII redaction covers common structured identifiers (email, phone, IBAN, card
-> numbers, API keys, Italian codice fiscale). It is not a full DLP product and
-> does not detect free-text names or special-category (Art. 9) data on its own.
+> numbers, API keys, Italian codice fiscale, German tax id). It is not a full DLP
+> product and does not detect free-text names or special-category (Art. 9) data
+> on its own.
 >
 > Art. 50 marking is partial: AEGIS adds a human-readable disclosure, a
 > machine-readable in-body marker and an `X-AI-Generated` header, but not a

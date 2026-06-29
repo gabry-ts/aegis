@@ -70,3 +70,14 @@ def test_non_card_digit_run_is_not_flagged_as_card():
 def test_codice_fiscale_is_detected():
     hits = pii.scan("tax code RSSMRA85T10A562S on file")
     assert any(h["name"] == "codice_fiscale" for h in hits)
+
+
+def test_valid_german_taxid_is_detected():
+    hits = pii.scan("Steuer-ID 86095742719 on file")  # valid structure + check digit
+    assert any(h["name"] == "german_taxid" for h in hits)
+
+
+def test_invalid_11_digit_number_is_not_a_german_taxid():
+    # All-distinct digits fail the structural rule, so it must not be flagged.
+    hits = pii.scan("ref 12345678901 attached")
+    assert not any(h["name"] == "german_taxid" for h in hits)

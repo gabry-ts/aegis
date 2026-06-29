@@ -15,6 +15,7 @@ network-free.
 """
 
 import re
+from collections import Counter
 from typing import Dict, List
 
 REDACTION = "[REDACTED]"
@@ -50,6 +51,12 @@ _PATTERNS = [
         re.compile(r"\b(?:\d[ -]?){13,16}\b"),
     ),
     (
+        # German tax id (Steuer-IdNr): 11 digits, optionally grouped 2-3-3-3.
+        # Validated by structure + checksum in scan() to keep false positives low.
+        "german_taxid",
+        re.compile(r"\b\d{2}[ ]?\d{3}[ ]?\d{3}[ ]?\d{3}\b"),
+    ),
+    (
         "phone",
         re.compile(r"(?<![\w.])\+?\d[\d\s().-]{7,}\d(?![\w.])"),
     ),
@@ -75,6 +82,30 @@ def _luhn_ok(value: str) -> bool:
     return checksum % 10 == 0
 
 
+def _is_german_taxid(value: str) -> bool:
+    """True if `value` is a valid German Steuer-IdNr (structure + check digit).
+
+    The first ten digits must contain exactly one digit appearing twice or three
+    times, and the eleventh is an ISO 7064 MOD 11,10 check digit. Together these
+    make a stray 11-digit number very unlikely to be mistaken for a tax id.
+    """
+    digits = [int(c) for c in value if c.isdigit()]
+    if len(digits) != 11:
+        return False
+    counts = Counter(digits[:10])
+    repeated = [d for d, c in counts.items() if c >= 2]
+    if len(repeated) != 1 or counts[repeated[0]] > 3:
+        return False
+    product = 10
+    for d in digits[:10]:
+        s = (d + product) % 10
+        if s == 0:
+            s = 10
+        product = (s * 2) % 11
+    check = (11 - product) % 10
+    return check == digits[10]
+
+
 def scan(text: str) -> List[Dict]:
     """Return every PII hit in `text` as `{"name", "match"}`.
 
@@ -92,6 +123,8 @@ def scan(text: str) -> List[Dict]:
             if any(start < c_end and end > c_start for c_start, c_end in claimed):
                 continue
             if name == "credit_card" and not _luhn_ok(m.group(0)):
+                continue
+            if name == "german_taxid" and not _is_german_taxid(m.group(0)):
                 continue
             claimed.append((start, end))
             hits.append({"name": name, "match": m.group(0)})
