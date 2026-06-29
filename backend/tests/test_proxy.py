@@ -142,3 +142,47 @@ def test_disclosure_respects_accept_language():
     assert body["blocked"] is False
     assert transparency.DISCLOSURES["it"] in body["reply"]
     assert body["reply"].count(transparency.MARKER) == 1
+
+
+def _block_on_output(verdict):
+    """An engine.inspect stand-in: input passes, output is hard-blocked."""
+    from aegis import schemas
+
+    def fake_inspect(text, direction="input", active_ids=None, judge_enabled=None):
+        if direction == "output":
+            return schemas.detection_result(
+                "output", verdict, 5, "BLOCKED", ["blocking_rule"], text, "blocked on output"
+            )
+        return schemas.detection_result("input", "SAFE", 0, "ALLOWED", [], text, "ok")
+
+    return fake_inspect
+
+
+def test_output_block_withholds_whole_reply(monkeypatch):
+    """A rule that blocks on output withholds the entire model response (hard
+    disposition) instead of letting it through unsanitized."""
+    from aegis.detection import engine
+
+    monkeypatch.setattr(engine, "inspect", _block_on_output("DATA_EXFILTRATION"))
+    resp = client.post("/api/chat", json={"text": "hello", "guard": True, "slug": "default"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["blocked"] is True
+    assert body["output_detection"]["action"] == "BLOCKED"
+    assert body["reply"].startswith("⚠️ Response blocked by AEGIS")
+    assert body["transparency"] is False
+
+
+def test_output_block_on_v1_endpoint(monkeypatch):
+    from aegis.detection import engine
+
+    monkeypatch.setattr(engine, "inspect", _block_on_output("SECRET_LEAK"))
+    resp = client.post(
+        "/v1/default/chat/completions",
+        json={"messages": [{"role": "user", "content": "hello"}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["aegis"]["verdict"] == "SECRET_LEAK"
+    assert "Response blocked by AEGIS" in body["choices"][0]["message"]["content"]
+    assert resp.headers.get("X-AI-Generated") == "false"

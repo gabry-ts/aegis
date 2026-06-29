@@ -216,7 +216,20 @@ def chat_completions(slug: str, req: schemas.ChatRequest, request: Request):
     )
     out = _inspect(raw, "output", active, judge_on)
     content = raw
+    if out["action"] == "BLOCKED":
+        # Hard disposition: the response is withheld entirely, not partially
+        # redacted, and the model output never reaches the client.
+        metrics.inc("aegis_blocked_total")
+        _record(clog.make_event(out, actor="api", endpoint=slug))
+        refusal = f"⚠️ Response blocked by AEGIS ({out['verdict']})."
+        if req.stream:
+            return StreamingResponse(_stream_text(refusal), media_type="text/event-stream")
+        return JSONResponse(
+            _completion(refusal, out["verdict"]),
+            headers={"X-AEGIS-Verdict": out["verdict"], transparency.HEADER: "false"},
+        )
     if out["action"] == "SANITIZED":
+        # Soft disposition: redact the sensitive spans, pass the rest through.
         metrics.inc("aegis_sanitized_total")
         content = engine.sanitize(raw)
         _record(clog.make_event(out, actor="api", endpoint=slug))
@@ -280,7 +293,17 @@ def api_chat(req: schemas.PlaygroundRequest, request: Request):
     out = _inspect(raw, "output", active, judge_on)
     reply = raw
     sanitized = False
+    if out["action"] == "BLOCKED":
+        # Hard disposition: withhold the whole response (no partial redaction).
+        metrics.inc("aegis_blocked_total")
+        events.append(_record(clog.make_event(out, actor="playground", endpoint=slug)))
+        return {
+            "guard": True, "blocked": True, "input_detection": det,
+            "reply": f"⚠️ Response blocked by AEGIS ({out['verdict']}).",
+            "output_detection": out, "sanitized": False, "transparency": False, "events": events,
+        }
     if out["action"] == "SANITIZED":
+        # Soft disposition: redact the sensitive spans, keep the rest.
         metrics.inc("aegis_sanitized_total")
         reply = engine.sanitize(raw)
         sanitized = True
