@@ -38,6 +38,18 @@ export default function Assessment() {
 
   const set = (id: string, v: string) => setAnswers((a) => ({ ...a, [id]: v }))
 
+  // Conditional questions (Art. 6(3) carve-out, GPAI systemic risk) only show
+  // once their precondition is met. Hidden answers keep their safe default, so
+  // classification stays correct whether or not the question was displayed.
+  const isVisible = (q: AssessQuestion) => {
+    const c = q.visible_when
+    if (!c) return true
+    const v = answers[c.field]
+    if (c.equals !== undefined) return v === c.equals
+    if (c.not_equals !== undefined) return v !== c.not_equals
+    return true
+  }
+
   const run = async () => {
     setBusy(true)
     try {
@@ -62,7 +74,7 @@ export default function Assessment() {
 
       <div className="assess-layout">
         <div className="assess-form">
-          {questions.map((q) => (
+          {questions.filter(isVisible).map((q) => (
             <div className="assess-q" key={q.id}>
               <div className="assess-q__label">{q.label}</div>
               <div className="assess-q__opts">

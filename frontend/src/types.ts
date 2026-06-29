@@ -230,10 +230,17 @@ export interface AssessOption {
   label: string
 }
 
+export interface AssessVisibleWhen {
+  field: string
+  equals?: string
+  not_equals?: string
+}
+
 export interface AssessQuestion {
   id: string
   label: string
   options: AssessOption[]
+  visible_when?: AssessVisibleWhen
 }
 
 export interface AssessQuestionsResponse {

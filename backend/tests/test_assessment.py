@@ -36,3 +36,9 @@ def test_gpai_with_systemic_risk_adds_article_55():
 def test_prohibited_overrides_everything():
     r = aiact.classify({"prohibited": "social_scoring", "domain": "employment"})
     assert r["tier"] == "prohibited"
+
+
+def test_conditional_questions_carry_visibility_rules():
+    by_id = {q["id"]: q for q in aiact.QUESTIONS}
+    assert by_id["procedural"]["visible_when"] == {"field": "domain", "not_equals": "none"}
+    assert by_id["systemic"]["visible_when"] == {"field": "gpai", "equals": "yes"}

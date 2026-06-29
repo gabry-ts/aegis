@@ -44,6 +44,8 @@ QUESTIONS: List[Dict[str, Any]] = [
             {"value": "no", "label": "No — it informs or decides about people"},
             {"value": "yes", "label": "Yes — narrow procedural / preparatory only"},
         ],
+        # Only relevant once an Annex III domain is selected.
+        "visible_when": {"field": "domain", "not_equals": "none"},
     },
     {
         "id": "interacts",
@@ -69,6 +71,8 @@ QUESTIONS: List[Dict[str, Any]] = [
             {"value": "no", "label": "No"},
             {"value": "yes", "label": "Yes — systemic risk"},
         ],
+        # Only relevant when the deployer is a GPAI provider.
+        "visible_when": {"field": "gpai", "equals": "yes"},
     },
 ]
 
