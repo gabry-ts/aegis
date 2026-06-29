@@ -194,6 +194,18 @@ class SqliteStore:
             for column in ("prev_hash", "hash"):
                 if column not in existing:
                     conn.execute(f"ALTER TABLE aegis_events ADD COLUMN {column} TEXT")
+            # Anchors record every retention prune so a legitimate prune of the
+            # oldest prefix stays distinguishable from a malicious deletion.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS aegis_audit_anchors (
+                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pruned_at        TEXT NOT NULL,
+                    last_pruned_hash TEXT,
+                    pruned_count     INTEGER NOT NULL
+                )
+                """
+            )
             conn.commit()
 
     def _load_last_hash(self):
@@ -278,13 +290,20 @@ class SqliteStore:
         return _aggregate_stats(self.all())
 
     def verify(self):
-        """Recompute the hash chain and report the first divergence, if any."""
-        return _verify_chain(self.all())
+        """Recompute the hash chain and report the first divergence, if any.
+
+        The last prune anchor is attached so a verifier can confirm the chain
+        head legitimately starts mid-stream because of a recorded retention prune.
+        """
+        result = _verify_chain(self.all())
+        result["last_anchor"] = self.last_anchor()
+        return result
 
     def clear(self):
         """Remove every event from the store and reset the chain head."""
         with _write_lock, closing(self._connect()) as conn:
             conn.execute("DELETE FROM aegis_events")
+            conn.execute("DELETE FROM aegis_audit_anchors")
             conn.commit()
         self._last_hash = ""
 
@@ -294,15 +313,43 @@ class SqliteStore:
         0 (or anything non-positive) disables retention and is a no-op. Only the
         oldest prefix is ever removed — ts grows with id — so the retained hash
         chain stays contiguous and the live chain head (_last_hash) is unaffected.
+        Each prune writes an anchor (hash of the last removed event and the count)
+        so the deletion is itself on the record.
         """
         if not retention_days or retention_days <= 0:
             return 0
         cutoff = _retention_cutoff(retention_days)
         with _write_lock, closing(self._connect()) as conn:
+            row = conn.execute(
+                "SELECT hash FROM aegis_events WHERE ts < ? ORDER BY id DESC LIMIT 1",
+                (cutoff,),
+            ).fetchone()
+            last_pruned_hash = row["hash"] if row else None
             cur = conn.execute("DELETE FROM aegis_events WHERE ts < ?", (cutoff,))
             removed = cur.rowcount
+            if removed:
+                conn.execute(
+                    "INSERT INTO aegis_audit_anchors (pruned_at, last_pruned_hash, pruned_count) "
+                    "VALUES (?, ?, ?)",
+                    (_utc_now(), last_pruned_hash, removed),
+                )
             conn.commit()
         return removed
+
+    def last_anchor(self):
+        """The most recent prune anchor as a dict, or None if nothing was pruned."""
+        with closing(self._connect()) as conn:
+            row = conn.execute(
+                "SELECT pruned_at, last_pruned_hash, pruned_count FROM aegis_audit_anchors "
+                "ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "pruned_at": row["pruned_at"],
+            "last_pruned_hash": row["last_pruned_hash"],
+            "pruned_count": row["pruned_count"],
+        }
 
 
 class PostgresStore:
@@ -340,6 +387,16 @@ class PostgresStore:
                         prev_hash TEXT,
                         hash      TEXT,
                         data      JSONB NOT NULL
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS aegis_audit_anchors (
+                        id               SERIAL PRIMARY KEY,
+                        pruned_at        TEXT NOT NULL,
+                        last_pruned_hash TEXT,
+                        pruned_count     INTEGER NOT NULL
                     )
                     """
                 )
@@ -434,12 +491,15 @@ class PostgresStore:
         return _aggregate_stats(self.all())
 
     def verify(self):
-        return _verify_chain(self.all())
+        result = _verify_chain(self.all())
+        result["last_anchor"] = self.last_anchor()
+        return result
 
     def clear(self):
         with _write_lock, closing(self._connect()) as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM aegis_events")
+                cur.execute("DELETE FROM aegis_audit_anchors")
             conn.commit()
         self._last_hash = ""
 
@@ -447,17 +507,43 @@ class PostgresStore:
         """Delete events older than `retention_days`; return how many were removed.
 
         Mirrors SqliteStore.prune: 0 disables retention, only the oldest prefix is
-        removed, and the retained hash chain stays contiguous.
+        removed, the retained hash chain stays contiguous, and each prune writes an
+        anchor recording the last removed hash and the count.
         """
         if not retention_days or retention_days <= 0:
             return 0
         cutoff = _retention_cutoff(retention_days)
         with _write_lock, closing(self._connect()) as conn:
             with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT hash FROM aegis_events WHERE ts < %s ORDER BY id DESC LIMIT 1",
+                    (cutoff,),
+                )
+                row = cur.fetchone()
+                last_pruned_hash = row[0] if row else None
                 cur.execute("DELETE FROM aegis_events WHERE ts < %s", (cutoff,))
                 removed = cur.rowcount
+                if removed:
+                    cur.execute(
+                        "INSERT INTO aegis_audit_anchors (pruned_at, last_pruned_hash, pruned_count) "
+                        "VALUES (%s, %s, %s)",
+                        (_utc_now(), last_pruned_hash, removed),
+                    )
             conn.commit()
         return removed
+
+    def last_anchor(self):
+        """The most recent prune anchor as a dict, or None if nothing was pruned."""
+        with closing(self._connect()) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT pruned_at, last_pruned_hash, pruned_count FROM aegis_audit_anchors "
+                    "ORDER BY id DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+        if row is None:
+            return None
+        return {"pruned_at": row[0], "last_pruned_hash": row[1], "pruned_count": row[2]}
 
 
 def make_store():
